@@ -48,7 +48,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       <Sidebar currentTab={currentTab} onTabChange={handleTabChange} />
 
       {/* Main Full-width Independently Scrollable Workspace */}
-      <div className="flex-1 p-4 pb-8 md:p-8 lg:p-10 flex flex-col gap-6 overflow-y-auto h-screen max-w-[1600px] w-full">
+      <div className="flex-1 pt-[72px] p-4 pb-8 md:p-8 lg:p-10 flex flex-col gap-6 overflow-y-auto h-full max-w-[1600px] w-full min-h-0">
         {children}
       </div>
     </main>
