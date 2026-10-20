@@ -42,13 +42,6 @@ export function StatCards({ onTabChange }: StatCardsProps) {
     }
     return "/salon-hero.jpg";
   });
-  const [recentThumbs, setRecentThumbs] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      const c = getCachedGallery();
-      return c?.items?.slice(0, 4).map((i) => i.imageUrl) || [];
-    }
-    return [];
-  });
 
   useEffect(() => {
     // 1. Live listener for Services collection
@@ -102,15 +95,14 @@ export function StatCards({ onTabChange }: StatCardsProps) {
               typeof item === "string"
                 ? item
                 : typeof item?.imageUrl === "string"
-                ? item.imageUrl.trim()
-                : ""
+                  ? item.imageUrl.trim()
+                  : ""
             )
             .filter((url: string) => Boolean(url && url.length > 0));
 
           if (validUrls.length > 0) {
             setGalleryCount(validUrls.length);
             setHeroImage(validUrls[0]);
-            setRecentThumbs(validUrls.slice(0, 4));
           } else {
             setGalleryCount(0);
           }
@@ -221,11 +213,10 @@ export function StatCards({ onTabChange }: StatCardsProps) {
                 return (
                   <div
                     key={index}
-                    className={`w-3.5 h-8 rounded-full transition-all ${
-                      isConfirmed
+                    className={`w-3.5 h-8 rounded-full transition-all ${isConfirmed
                         ? "bg-white"
                         : "border-2 border-dashed border-white/50 bg-white/20"
-                    }`}
+                      }`}
                   />
                 );
               }
@@ -266,32 +257,8 @@ export function StatCards({ onTabChange }: StatCardsProps) {
           </span>
         </div>
 
-        {/* Thumbnail Avatars + Action Button */}
-        <div className="relative z-10 pt-3 flex items-center justify-between gap-2 flex-wrap">
-          {recentThumbs.length > 0 ? (
-            <div className="flex -space-x-2 shrink-0">
-              {recentThumbs.map((url, i) => (
-                <div
-                  key={i}
-                  className="w-7 h-7 rounded-full border-2 border-[#111214] overflow-hidden relative shadow-xs"
-                >
-                  <img
-                    src={url}
-                    alt={`Preview ${i + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ))}
-              {galleryCount > 4 && (
-                <span className="w-7 h-7 rounded-full bg-zinc-800 border-2 border-[#111214] flex items-center justify-center text-[9px] font-bold text-white shadow-xs">
-                  +{galleryCount - 4}
-                </span>
-              )}
-            </div>
-          ) : (
-            <span className="text-[11px] text-zinc-400 font-medium">100% High-Res</span>
-          )}
-
+        {/* Action Button */}
+        <div className="relative z-10 pt-3 flex items-center justify-end">
           <button
             type="button"
             onClick={(e) => {
