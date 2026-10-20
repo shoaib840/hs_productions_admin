@@ -331,38 +331,38 @@ export function ServicesScreen() {
           {services.map((item) => (
             <div
               key={item.id}
-              className="p-4 rounded-2xl bg-white border border-zinc-200/90 shadow-sm hover:shadow-md transition-all flex flex-col sm:flex-row gap-3.5 items-stretch group hover:border-[#FF272A]/40"
+              className="p-3 sm:p-4 rounded-2xl bg-white border border-zinc-200/90 shadow-sm hover:shadow-md transition-all flex flex-row gap-3 sm:gap-4 items-stretch group hover:border-[#FF272A]/40"
             >
               {/* Left Side Image */}
-              <div className="relative w-full sm:w-24 h-28 sm:h-auto rounded-xl overflow-hidden shrink-0 bg-zinc-100">
+              <div className="relative w-24 sm:w-28 md:w-32 min-h-[105px] sm:min-h-[120px] rounded-xl overflow-hidden shrink-0 bg-zinc-100 self-stretch">
                 <Image
                   src={item.image}
                   alt={item.name}
                   fill
                   unoptimized
-                  sizes="(max-width: 640px) 100vw, 96px"
+                  sizes="(max-width: 640px) 112px, 128px"
                   className="object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               </div>
 
               {/* Right Side Content */}
-              <div className="flex-1 flex flex-col justify-between">
+              <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
                 <div>
-                  <h3 className="font-bold text-base text-zinc-900 group-hover:text-[#FF272A] transition-colors leading-snug">
+                  <h3 className="font-bold text-sm sm:text-base text-zinc-900 group-hover:text-[#FF272A] transition-colors leading-snug line-clamp-1 sm:line-clamp-2">
                     {item.name}
                   </h3>
-                  <p className="text-xs text-zinc-500 mt-1.5 leading-relaxed line-clamp-2">
+                  <p className="text-[11px] sm:text-xs text-zinc-500 mt-1 leading-relaxed line-clamp-2">
                     {item.description}
                   </p>
                 </div>
 
-                <div className="pt-3 mt-3 border-t border-zinc-100 flex items-center justify-between">
+                <div className="pt-2 sm:pt-3 mt-2 border-t border-zinc-100 flex items-center justify-between gap-1 flex-wrap">
                   <div>
-                    <span className="text-lg font-black text-zinc-900">Rs.{item.price}</span>
-                    <span className="text-[11px] text-zinc-400 ml-1.5">/ {item.duration}</span>
+                    <span className="text-base sm:text-lg font-black text-zinc-900">Rs.{item.price}</span>
+                    <span className="text-[10px] sm:text-[11px] text-zinc-400 ml-1">/ {item.duration}</span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(item)}
