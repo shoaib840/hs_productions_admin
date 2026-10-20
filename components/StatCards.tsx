@@ -20,7 +20,7 @@ interface StatCardsProps {
 export function StatCards({ onTabChange }: StatCardsProps) {
   // 1. Services Stats State
   const [servicesCount, setServicesCount] = useState<number>(6);
-  const [avgTicket, setAvgTicket] = useState<number>(185);
+  const [totalServicesPrice, setTotalServicesPrice] = useState<number>(0);
 
   // 2. Inquiries Stats State
   const [inquiriesCount, setInquiriesCount] = useState<number>(4);
@@ -51,7 +51,7 @@ export function StatCards({ onTabChange }: StatCardsProps) {
             .filter((p) => p > 0);
           if (prices.length > 0) {
             const sum = prices.reduce((acc, curr) => acc + curr, 0);
-            setAvgTicket(Math.round(sum / prices.length));
+            setTotalServicesPrice(sum);
           }
         }
       },
@@ -143,7 +143,7 @@ export function StatCards({ onTabChange }: StatCardsProps) {
               {String(servicesCount).padStart(2, "0")}
             </span>
             <span className="text-zinc-500 text-xs font-semibold">
-              Avg. ${avgTicket} ticket
+              Total Rs. {totalServicesPrice.toLocaleString()}
             </span>
           </div>
         </div>
@@ -208,11 +208,10 @@ export function StatCards({ onTabChange }: StatCardsProps) {
                 return (
                   <div
                     key={index}
-                    className={`w-3.5 h-8 rounded-full transition-all ${
-                      isConfirmed
+                    className={`w-3.5 h-8 rounded-full transition-all ${isConfirmed
                         ? "bg-white"
                         : "border-2 border-dashed border-white/50 bg-white/20"
-                    }`}
+                      }`}
                   />
                 );
               }
