@@ -5,13 +5,13 @@ import Image from "next/image";
 import {
   Layers,
   PhoneCall,
-  Tag,
   ArrowUpRight,
-  Sparkles,
   CheckCircle2,
+  Images,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, doc, onSnapshot } from "firebase/firestore";
+import { getCachedGallery } from "@/lib/galleryCache";
 
 interface StatCardsProps {
   onTabChange?: (tab: string) => void;
@@ -27,15 +27,27 @@ export function StatCards({ onTabChange }: StatCardsProps) {
   const [confirmedCount, setConfirmedCount] = useState<number>(3);
   const [pendingCount, setPendingCount] = useState<number>(1);
 
-  // 3. Featured Offer State
-  const [featuredOffer, setFeaturedOffer] = useState<{
-    title: string;
-    code: string;
-    discountText: string;
-  }>({
-    title: "Autumn Balayage Glamour Special",
-    code: "BALAYAGE25",
-    discountText: "25% OFF",
+  // 3. Gallery Lookbook State
+  const [galleryCount, setGalleryCount] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const c = getCachedGallery();
+      return c?.items?.length || 0;
+    }
+    return 0;
+  });
+  const [heroImage, setHeroImage] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const c = getCachedGallery();
+      return c?.items?.[0]?.imageUrl || "/salon-hero.jpg";
+    }
+    return "/salon-hero.jpg";
+  });
+  const [recentThumbs, setRecentThumbs] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      const c = getCachedGallery();
+      return c?.items?.slice(0, 4).map((i) => i.imageUrl) || [];
+    }
+    return [];
   });
 
   useEffect(() => {
@@ -78,38 +90,39 @@ export function StatCards({ onTabChange }: StatCardsProps) {
       (err) => console.error("Firestore inquiries stat error:", err)
     );
 
-    // 3. Live listener for Offers collection
-    const unsubOffers = onSnapshot(
-      collection(db, "offers"),
+    // 3. Live listener for Gallery collection
+    const unsubGallery = onSnapshot(
+      doc(db, "gallery", "gallery"),
       (snap) => {
-        if (!snap.empty) {
-          const activeDocs = snap.docs
-            .map((d) => d.data())
-            .filter((d) => d.status === "Active" || !d.status);
-          if (activeDocs.length > 0) {
-            const first = activeDocs[0];
-            const discount =
-              first.discountType === "percentage"
-                ? `${first.discountValue}% OFF`
-                : `$${first.discountValue} OFF`;
-            const code =
-              first.code ||
-              (first.title ? first.title.replace(/[^A-Z0-9]/gi, "").slice(0, 8).toUpperCase() : "PROMO");
-            setFeaturedOffer({
-              title: first.title || "Salon Exclusive Promotion",
-              code: code,
-              discountText: discount,
-            });
+        if (snap.exists()) {
+          const data = snap.data();
+          const rawImages: any[] = data.images || data.items || [];
+          const validUrls = rawImages
+            .map((item: any) =>
+              typeof item === "string"
+                ? item
+                : typeof item?.imageUrl === "string"
+                ? item.imageUrl.trim()
+                : ""
+            )
+            .filter((url: string) => Boolean(url && url.length > 0));
+
+          if (validUrls.length > 0) {
+            setGalleryCount(validUrls.length);
+            setHeroImage(validUrls[0]);
+            setRecentThumbs(validUrls.slice(0, 4));
+          } else {
+            setGalleryCount(0);
           }
         }
       },
-      (err) => console.error("Firestore offers stat error:", err)
+      (err) => console.error("Firestore gallery stat error:", err)
     );
 
     return () => {
       unsubServices();
       unsubInquiries();
-      unsubOffers();
+      unsubGallery();
     };
   }, []);
 
@@ -208,10 +221,11 @@ export function StatCards({ onTabChange }: StatCardsProps) {
                 return (
                   <div
                     key={index}
-                    className={`w-3.5 h-8 rounded-full transition-all ${isConfirmed
+                    className={`w-3.5 h-8 rounded-full transition-all ${
+                      isConfirmed
                         ? "bg-white"
                         : "border-2 border-dashed border-white/50 bg-white/20"
-                      }`}
+                    }`}
                   />
                 );
               }
@@ -223,41 +237,71 @@ export function StatCards({ onTabChange }: StatCardsProps) {
         </div>
       </div>
 
-      {/* 3. Promo Banner Card (Obsidian #111214 Theme) */}
-      <div className="bg-[#111214] text-white rounded-[30px] p-6 relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-all group min-h-[170px]">
-        {/* Background salon photo overlay */}
-        <div className="absolute right-0 top-0 bottom-0 w-[52%] pointer-events-none opacity-85 group-hover:scale-105 transition-transform duration-300">
+      {/* 3. Studio Gallery Box (Obsidian #111214 Theme) */}
+      <div
+        onClick={() => onTabChange?.("gallery")}
+        className="bg-[#111214] text-white rounded-[30px] p-6 relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-all group min-h-[170px] cursor-pointer active:scale-[0.99]"
+      >
+        {/* Background photo overlay */}
+        <div className="absolute right-0 top-0 bottom-0 w-[55%] pointer-events-none opacity-80 group-hover:scale-105 transition-transform duration-500">
           <Image
-            src="/salon-hero.jpg"
-            alt="Promotion Banner"
+            src={heroImage}
+            alt="Studio Lookbook"
             fill
             className="object-cover object-center"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#111214] via-[#111214]/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#111214] via-[#111214]/80 to-transparent" />
         </div>
 
-        {/* Banner Title */}
-        <div className="relative z-10 max-w-[60%]">
-          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-widest text-[#FF272A] mb-1">
-            <Sparkles className="w-3 h-3" /> Featured Offer
+        {/* Card Header & Title */}
+        <div className="relative z-10 max-w-[65%]">
+          <span className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-widest text-[#FF272A] mb-1">
+            <Images className="w-3.5 h-3.5" /> Studio Gallery
           </span>
-          <h2 className="text-base sm:text-lg font-extrabold leading-tight line-clamp-2">
-            {featuredOffer.title}
+          <h2 className="text-base sm:text-lg font-extrabold leading-tight text-white mt-0.5">
+            Visual Lookbook
           </h2>
-          <span className="text-xs text-zinc-400 font-semibold block mt-1">
-            {featuredOffer.discountText} • Code {featuredOffer.code}
+          <span className="text-xs text-zinc-400 font-semibold block mt-0.5">
+            {galleryCount > 0 ? `${galleryCount} Showcase Photos` : "Curated Visuals"}
           </span>
         </div>
 
-        {/* Action Button */}
-        <div className="relative z-10 pt-3">
+        {/* Thumbnail Avatars + Action Button */}
+        <div className="relative z-10 pt-3 flex items-center justify-between gap-2 flex-wrap">
+          {recentThumbs.length > 0 ? (
+            <div className="flex -space-x-2 shrink-0">
+              {recentThumbs.map((url, i) => (
+                <div
+                  key={i}
+                  className="w-7 h-7 rounded-full border-2 border-[#111214] overflow-hidden relative shadow-xs"
+                >
+                  <img
+                    src={url}
+                    alt={`Preview ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+              {galleryCount > 4 && (
+                <span className="w-7 h-7 rounded-full bg-zinc-800 border-2 border-[#111214] flex items-center justify-center text-[9px] font-bold text-white shadow-xs">
+                  +{galleryCount - 4}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-[11px] text-zinc-400 font-medium">100% High-Res</span>
+          )}
+
           <button
             type="button"
-            onClick={() => onTabChange?.("offers")}
-            className="px-4 py-2 rounded-full bg-white hover:bg-zinc-100 text-zinc-950 text-xs font-bold inline-flex items-center gap-1.5 shadow-sm transition-transform hover:scale-[1.02] cursor-pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTabChange?.("gallery");
+            }}
+            className="px-3.5 py-1.5 rounded-full bg-white hover:bg-zinc-100 text-zinc-950 text-xs font-bold inline-flex items-center gap-1.5 shadow-sm transition-transform hover:scale-[1.02] cursor-pointer"
           >
-            <Tag className="w-3 h-3 text-[#FF272A]" />
-            <span>Manage Offers</span>
+            <span>Open Gallery</span>
+            <ArrowUpRight className="w-3 h-3 text-zinc-700" />
           </button>
         </div>
       </div>
