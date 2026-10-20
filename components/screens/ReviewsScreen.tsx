@@ -184,7 +184,7 @@ export function ReviewsScreen() {
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-fadeIn pb-10">
+    <div className="flex flex-col gap-6 pb-10">
       {/* Top Header */}
       <div className="flex flex-col gap-1.5">
         <div className="hidden sm:flex items-center gap-2">
@@ -363,7 +363,7 @@ export function ReviewsScreen() {
       {/* Add Review Modal */}
       {isAddModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
           onClick={() => !isSaving && setIsAddModalOpen(false)}
         >
           <div

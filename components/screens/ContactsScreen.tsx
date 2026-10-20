@@ -154,7 +154,7 @@ export function ContactsScreen() {
   };
 
   return (
-    <div className="flex flex-col gap-6 animate-fadeIn">
+    <div className="flex flex-col gap-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -295,7 +295,7 @@ export function ContactsScreen() {
 
       {/* Add New Inquiry Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl border border-zinc-200 animate-scaleUp">
             <div className="flex items-center justify-between pb-4 border-b border-zinc-100">
               <h3 className="font-bold text-base text-zinc-900">Add Inbound Inquiry</h3>

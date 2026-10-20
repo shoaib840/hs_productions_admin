@@ -214,8 +214,8 @@ export function StatCards({ onTabChange }: StatCardsProps) {
                   <div
                     key={index}
                     className={`w-3.5 h-8 rounded-full transition-all ${isConfirmed
-                        ? "bg-white"
-                        : "border-2 border-dashed border-white/50 bg-white/20"
+                      ? "bg-white"
+                      : "border-2 border-dashed border-white/50 bg-white/20"
                       }`}
                   />
                 );

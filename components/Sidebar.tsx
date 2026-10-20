@@ -90,7 +90,7 @@ export function Sidebar({ currentTab, onTabChange }: SidebarProps) {
   return (
     <>
       {/* 1. Mobile Top Bar Header (Fixed on mobile screens < md) */}
-      <header className="md:hidden fixed top-0 inset-x-0 h-14 bg-[#161719] border-b border-white/[0.08] px-4 flex items-center justify-between z-40 select-none shadow-md">
+      <header className="md:hidden fixed top-0 inset-x-0 h-14 bg-[#161719] border-b border-white/[0.08] px-4 flex items-center justify-between z-30 select-none shadow-md">
         <div className="flex items-center gap-3">
           {/* Menu Icon Button (Replaces Logo) */}
           <button
@@ -141,7 +141,7 @@ export function Sidebar({ currentTab, onTabChange }: SidebarProps) {
 
       {/* 2. Mobile Sidebar Slide-in Drawer with Bidirectional Animation */}
       <div
-        className={`fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex md:hidden transition-opacity duration-300 ease-in-out ${isMobileDrawerOpen
+        className={`fixed inset-0 z-[150] bg-black/75 backdrop-blur-xs flex md:hidden transition-opacity duration-300 ease-in-out ${isMobileDrawerOpen
             ? "opacity-100 pointer-events-auto"
             : "opacity-0 pointer-events-none"
           }`}
