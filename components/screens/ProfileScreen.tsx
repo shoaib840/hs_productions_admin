@@ -96,6 +96,7 @@ export function ProfileScreen() {
   // 2. Studio & Location Details State (Loaded from Firestore)
   const [studioAddress, setStudioAddress] = useState<string>("");
   const [studioPhone, setStudioPhone] = useState<string>("");
+  const [studioWhatsapp, setStudioWhatsapp] = useState<string>("");
   const [openingHours, setOpeningHours] = useState<string>("");
   const [mapLink, setMapLink] = useState<string>("");
   const [isSavingStudio, setIsSavingStudio] = useState<boolean>(false);
@@ -156,6 +157,7 @@ export function ProfileScreen() {
           const data = snap.data();
           setStudioAddress(data.studioAddress || "");
           setStudioPhone(data.studioPhone || "");
+          setStudioWhatsapp(data.studioWhatsapp || data.whatsapp || "");
           setOpeningHours(data.openingHours || "");
           setMapLink(data.mapLink || "");
         }
@@ -210,6 +212,7 @@ export function ProfileScreen() {
         const data = stSnap.data();
         setStudioAddress(data.studioAddress || "");
         setStudioPhone(data.studioPhone || "");
+        setStudioWhatsapp(data.studioWhatsapp || data.whatsapp || "");
         setOpeningHours(data.openingHours || "");
         setMapLink(data.mapLink || "");
       }
@@ -293,6 +296,7 @@ export function ProfileScreen() {
         {
           studioAddress: studioAddress.trim(),
           studioPhone: studioPhone.trim(),
+          studioWhatsapp: studioWhatsapp.trim(),
           openingHours: openingHours.trim(),
           mapLink: mapLink.trim(),
           updatedAt: serverTimestamp(),
@@ -608,7 +612,7 @@ export function ProfileScreen() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* 1. Address */}
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
                 <label className="text-xs font-semibold text-zinc-700">Studio Address</label>
                 <input
                   type="text"
@@ -619,19 +623,47 @@ export function ProfileScreen() {
                 />
               </div>
 
-              {/* 2. Contact Number */}
+              {/* 2. Direct Phone Number */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-zinc-700">Contact Number</label>
+                <label className="text-xs font-semibold text-zinc-700">Direct Phone Number</label>
                 <input
                   type="text"
                   value={studioPhone}
                   onChange={(e) => setStudioPhone(e.target.value)}
-                  placeholder="e.g. +92 300 1234567"
+                  placeholder="e.g. 03041539548"
                   className="px-3.5 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF272A]/30 focus:border-[#FF272A]"
                 />
               </div>
 
-              {/* 3. Opening Hours */}
+              {/* 3. WhatsApp Number */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-zinc-700 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>WhatsApp Number</span>
+                  </span>
+                  {studioWhatsapp && (
+                    <a
+                      href={`https://wa.me/${studioWhatsapp.replace(/[^0-9]/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-emerald-600 font-semibold hover:text-emerald-700 flex items-center gap-1"
+                    >
+                      <span>Chat</span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  value={studioWhatsapp}
+                  onChange={(e) => setStudioWhatsapp(e.target.value)}
+                  placeholder="e.g. 03041539548"
+                  className="px-3.5 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF272A]/30 focus:border-[#FF272A]"
+                />
+              </div>
+
+              {/* 4. Opening Hours */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-zinc-700">Opening Hours</label>
                 <input
@@ -643,7 +675,7 @@ export function ProfileScreen() {
                 />
               </div>
 
-              {/* 4. Google Maps Link */}
+              {/* 5. Google Maps Link */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-zinc-700 flex items-center justify-between">
                   <span>Google Map Pin Link</span>
