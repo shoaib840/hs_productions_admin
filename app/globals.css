@@ -2,25 +2,91 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --panel-bg: #ffffff;
+  --sidebar-bg: #161719;
+  --sidebar-active: #27282c;
+  --sidebar-hover: #212226;
+
+  --card-neutral: #f3f5f3;
+  --card-neutral-hover: #ebeceb;
+  --card-red: #FF272A;
+  --card-lime: #FF272A;
+  --card-dark: #121316;
+
+  --text-primary: #121316;
+  --text-muted: #73777d;
+  --text-light: #f5f6f8;
+
+  --border-subtle: #eaedea;
+  --border-dark: #2a2c31;
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-panel: var(--panel-bg);
+  --color-sidebar: var(--sidebar-bg);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-card-neutral: var(--card-neutral);
+  --color-card-red: var(--card-red);
+  --color-card-lime: var(--card-red);
+  --color-card-dark: var(--card-dark);
+  --font-display: var(--font-plus-jakarta), sans-serif;
+  --font-sans: var(--font-plus-jakarta), sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar utility */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+@keyframes slideRight {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slideRight {
+  animation: slideRight 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
 }
