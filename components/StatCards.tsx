@@ -142,17 +142,13 @@ export function StatCards({ onTabChange }: StatCardsProps) {
             <span className="text-[44px] font-bold text-[#111215] tracking-tight leading-none">
               {String(servicesCount).padStart(2, "0")}
             </span>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500 text-white text-xs font-semibold shadow-2xs">
-              <CheckCircle2 className="w-3 h-3" />
-              100% Live
-            </span>
             <span className="text-zinc-500 text-xs font-semibold">
               Avg. ${avgTicket} ticket
             </span>
           </div>
         </div>
 
-        {/* Capsule Progress Bars: Dynamic active service categories */}
+        {/* Capsule Progress Bars + 100% Live Badge */}
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-1.5">
             {Array.from({ length: pillsToRender }).map((_, index) => (
@@ -163,6 +159,10 @@ export function StatCards({ onTabChange }: StatCardsProps) {
               />
             ))}
           </div>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[11px] font-semibold shadow-2xs">
+            <CheckCircle2 className="w-3 h-3" />
+            100% Live
+          </span>
         </div>
       </div>
 
