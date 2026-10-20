@@ -694,7 +694,7 @@ export function ProfileScreen() {
           </form>
         </div>
 
-        {/* Right Column: Social Links & WhatsApp + Change Password */}
+        {/* Right Column: Social Links + Change Password */}
         <div className="lg:col-span-5 flex flex-col gap-6">
           {/* Social Links Form */}
           <form
@@ -707,7 +707,7 @@ export function ProfileScreen() {
                 <span>Social & Communication Channels</span>
               </h3>
               <p className="text-xs text-zinc-500 mt-0.5">
-                Direct client links for social profiles and WhatsApp.
+                Direct client links for social profiles.
               </p>
             </div>
 
@@ -847,34 +847,6 @@ export function ProfileScreen() {
                 value={linkedin}
                 onChange={(e) => setLinkedin(e.target.value)}
                 placeholder="https://linkedin.com/company/yourcompany"
-                className="px-3.5 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF272A]/30 focus:border-[#FF272A]"
-              />
-            </div>
-
-            {/* WhatsApp Number */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-zinc-700 flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>WhatsApp Number</span>
-                </span>
-                {whatsapp && (
-                  <a
-                    href={`https://wa.me/${whatsapp.replace(/[^0-9]/g, "")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-emerald-600 font-semibold hover:text-emerald-700 flex items-center gap-1"
-                  >
-                    <span>Chat</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </a>
-                )}
-              </label>
-              <input
-                type="text"
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                placeholder="+92 300 1234567"
                 className="px-3.5 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF272A]/30 focus:border-[#FF272A]"
               />
             </div>
