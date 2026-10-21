@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Camera,
   ShieldCheck,
+  Mail,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { auth, db } from "@/lib/firebase";
@@ -95,6 +96,7 @@ export function ProfileScreen() {
 
   // 2. Studio & Location Details State (Loaded from Firestore)
   const [studioAddress, setStudioAddress] = useState<string>("");
+  const [studioEmail, setStudioEmail] = useState<string>("");
   const [studioPhone, setStudioPhone] = useState<string>("");
   const [studioWhatsapp, setStudioWhatsapp] = useState<string>("");
   const [openingHours, setOpeningHours] = useState<string>("");
@@ -156,6 +158,7 @@ export function ProfileScreen() {
         if (snap.exists()) {
           const data = snap.data();
           setStudioAddress(data.studioAddress || "");
+          setStudioEmail(data.studioEmail || data.email || "");
           setStudioPhone(data.studioPhone || "");
           setStudioWhatsapp(data.studioWhatsapp || data.whatsapp || "");
           setOpeningHours(data.openingHours || "");
@@ -211,6 +214,7 @@ export function ProfileScreen() {
       if (stSnap.exists()) {
         const data = stSnap.data();
         setStudioAddress(data.studioAddress || "");
+        setStudioEmail(data.studioEmail || data.email || "");
         setStudioPhone(data.studioPhone || "");
         setStudioWhatsapp(data.studioWhatsapp || data.whatsapp || "");
         setOpeningHours(data.openingHours || "");
@@ -295,6 +299,7 @@ export function ProfileScreen() {
         doc(db, "settings", "studio"),
         {
           studioAddress: studioAddress.trim(),
+          studioEmail: studioEmail.trim(),
           studioPhone: studioPhone.trim(),
           studioWhatsapp: studioWhatsapp.trim(),
           openingHours: openingHours.trim(),
@@ -426,9 +431,8 @@ export function ProfileScreen() {
               className="flex items-center justify-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-full border border-zinc-200/90 bg-white hover:bg-zinc-50 text-zinc-700 font-semibold text-xs transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-60 group"
             >
               <RefreshCw
-                className={`w-3.5 h-3.5 text-zinc-600 transition-transform ${
-                  isSyncing ? "animate-spin text-[#FF272A]" : "group-hover:rotate-45"
-                }`}
+                className={`w-3.5 h-3.5 text-zinc-600 transition-transform ${isSyncing ? "animate-spin text-[#FF272A]" : "group-hover:rotate-45"
+                  }`}
               />
               <span>{isSyncing ? "Syncing..." : "Sync"}</span>
             </button>
@@ -528,7 +532,7 @@ export function ProfileScreen() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-zinc-700">Studio Email</label>
+                <label className="text-xs font-semibold text-zinc-700">Email</label>
                 <input
                   type="email"
                   value={email}
@@ -611,7 +615,7 @@ export function ProfileScreen() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* 1. Address */}
+              {/* 1. Studio Address */}
               <div className="flex flex-col gap-1.5 sm:col-span-2">
                 <label className="text-xs font-semibold text-zinc-700">Studio Address</label>
                 <input
@@ -623,7 +627,33 @@ export function ProfileScreen() {
                 />
               </div>
 
-              {/* 2. Direct Phone Number */}
+              {/* 2. Studio Email Address */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-zinc-700 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-zinc-500" />
+                    <span>Studio Email Address</span>
+                  </span>
+                  {studioEmail && (
+                    <a
+                      href={`mailto:${studioEmail}`}
+                      className="text-[11px] text-[#FF272A] hover:underline flex items-center gap-1 font-bold"
+                    >
+                      <span>Mail</span>
+                      <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  )}
+                </label>
+                <input
+                  type="email"
+                  value={studioEmail}
+                  onChange={(e) => setStudioEmail(e.target.value)}
+                  placeholder="e.g. info@hsproductions.com"
+                  className="px-3.5 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-xs text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF272A]/30 focus:border-[#FF272A]"
+                />
+              </div>
+
+              {/* 3. Direct Phone Number */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-zinc-700">Direct Phone Number</label>
                 <input
@@ -635,7 +665,7 @@ export function ProfileScreen() {
                 />
               </div>
 
-              {/* 3. WhatsApp Number */}
+              {/* 4. WhatsApp Number */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-zinc-700 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
@@ -663,7 +693,7 @@ export function ProfileScreen() {
                 />
               </div>
 
-              {/* 4. Opening Hours */}
+              {/* 5. Opening Hours */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-zinc-700">Opening Hours</label>
                 <input
@@ -675,8 +705,8 @@ export function ProfileScreen() {
                 />
               </div>
 
-              {/* 5. Google Maps Link */}
-              <div className="flex flex-col gap-1.5">
+              {/* 6. Google Maps Link */}
+              <div className="flex flex-col gap-1.5 sm:col-span-2">
                 <label className="text-xs font-semibold text-zinc-700 flex items-center justify-between">
                   <span>Google Map Pin Link</span>
                   {mapLink && (
