@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { BarChart3, ChevronDown, Calendar, Loader2 } from "lucide-react";
+import { BarChart3, Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 
@@ -15,7 +15,6 @@ interface ChartBarPoint {
 
 export function StatisticsChart() {
   const [timeframe, setTimeframe] = useState<"7days" | "6months">("7days");
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -166,56 +165,30 @@ export function StatisticsChart() {
           </div>
         </div>
 
-        {/* Timeframe Period Selector Dropdown */}
-        <div className="relative">
+        {/* Timeframe Toggle Buttons in a Row */}
+        <div className="inline-flex items-center p-1 bg-white rounded-full border border-zinc-200/80 shadow-2xs shrink-0 self-start sm:self-auto">
           <button
             type="button"
-            onClick={() => setIsDropdownOpen((prev) => !prev)}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-zinc-200/80 text-xs font-bold text-zinc-800 shadow-2xs hover:bg-zinc-50 transition cursor-pointer select-none"
+            onClick={() => setTimeframe("7days")}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer select-none ${
+              timeframe === "7days"
+                ? "bg-[#111215] text-white shadow-xs"
+                : "text-zinc-600 hover:text-black hover:bg-zinc-100/60"
+            }`}
           >
-            <Calendar className="w-3.5 h-3.5 text-[#FF272A]" />
-            <span>{timeframe === "7days" ? "Last 7 Days" : "Last 6 Months"}</span>
-            <ChevronDown
-              className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${
-                isDropdownOpen ? "rotate-180" : ""
-              }`}
-            />
+            Last 7 Days
           </button>
-
-          {isDropdownOpen && (
-            <div className="absolute right-0 mt-1.5 w-44 bg-white rounded-2xl shadow-xl border border-zinc-100 p-1 z-30 animate-fadeIn select-none">
-              <button
-                type="button"
-                onClick={() => {
-                  setTimeframe("7days");
-                  setIsDropdownOpen(false);
-                }}
-                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer ${
-                  timeframe === "7days"
-                    ? "bg-[#111215] text-white"
-                    : "text-zinc-700 hover:bg-zinc-100"
-                }`}
-              >
-                <span>Last 7 Days</span>
-                <span className="text-[10px] opacity-70">Daily</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setTimeframe("6months");
-                  setIsDropdownOpen(false);
-                }}
-                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer ${
-                  timeframe === "6months"
-                    ? "bg-[#111215] text-white"
-                    : "text-zinc-700 hover:bg-zinc-100"
-                }`}
-              >
-                <span>Last 6 Months</span>
-                <span className="text-[10px] opacity-70">Monthly</span>
-              </button>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => setTimeframe("6months")}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer select-none ${
+              timeframe === "6months"
+                ? "bg-[#111215] text-white shadow-xs"
+                : "text-zinc-600 hover:text-black hover:bg-zinc-100/60"
+            }`}
+          >
+            Last 6 Months
+          </button>
         </div>
       </div>
 
