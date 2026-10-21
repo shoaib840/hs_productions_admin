@@ -84,7 +84,7 @@ export function Sidebar({ currentTab, onTabChange }: SidebarProps) {
     { id: "reviews", icon: Star, label: "Reviews" },
     { id: "gallery", icon: Images, label: "Gallery" },
     { id: "about", icon: Info, label: "About Us" },
-    { id: "contacts", icon: Phone, label: "Contacts" },
+    { id: "contacts", icon: Phone, label: "Inquiries" },
   ];
 
   return (

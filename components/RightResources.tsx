@@ -7,6 +7,8 @@ import {
   ArrowUpRight,
   MapPin,
   Loader2,
+  Check,
+  Inbox,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
@@ -71,7 +73,7 @@ const DEFAULT_INQUIRIES: InquiryItem[] = [
 
 function getBadgeStyle(status: string) {
   const s = status.toLowerCase();
-  if (s === "confirmed") {
+  if (s === "confirmed" || s === "marked" || s === "read") {
     return "bg-emerald-50 text-emerald-700 border-emerald-200";
   }
   if (s === "contacted") {
@@ -128,60 +130,41 @@ export function RightResources({ onTabChange }: RightResourcesProps) {
       (err) => console.error("Firestore offers error:", err)
     );
 
-    // 3. Listen to Inquiries collection
-    const inqQuery = query(collection(db, "inquiries"), orderBy("createdAt", "desc"), limit(4));
+    // 3. Listen to Leads collection
+    const inqQuery = query(collection(db, "leads"), orderBy("createdAt", "desc"), limit(4));
     const unsubInquiries = onSnapshot(
       inqQuery,
-      async (snap) => {
-        if (!snap.empty) {
-          const loaded: InquiryItem[] = snap.docs.map((d) => {
-            const data = d.data();
-            let timeStr = data.time || "";
-            if (!timeStr && data.createdAt) {
-              const dateObj = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
-              timeStr = dateObj.toLocaleDateString("en-US", {
+      (snap) => {
+        const loaded: InquiryItem[] = snap.docs.map((d) => {
+          const data = d.data();
+          let timeStr = "";
+          if (data.createdAt) {
+            const dateObj = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+            timeStr =
+              dateObj.toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
-              }) + " • " + dateObj.toLocaleTimeString("en-US", {
+              }) +
+              " • " +
+              dateObj.toLocaleTimeString("en-US", {
                 hour: "numeric",
                 minute: "2-digit",
               });
-            }
-            return {
-              id: d.id,
-              client: data.client || data.name || "Client",
-              service: data.service || data.serviceRequested || "Consultation",
-              time: timeStr || "Recent",
-              status: data.status || "New",
-              phone: data.phone || "",
-            };
-          });
-          setInquiries(loaded);
-          setInquiriesLoading(false);
-        } else {
-          // If Firestore inquiries collection is empty, auto-seed with defaults
-          try {
-            const checkSnap = await getDocs(collection(db, "inquiries"));
-            if (checkSnap.empty) {
-              for (const item of DEFAULT_INQUIRIES) {
-                await setDoc(doc(db, "inquiries", item.id), {
-                  client: item.client,
-                  service: item.service,
-                  time: item.time,
-                  status: item.status,
-                  phone: item.phone,
-                  createdAt: serverTimestamp(),
-                });
-              }
-            }
-          } catch (e) {
-            console.error("Error seeding initial inquiries:", e);
           }
-          setInquiriesLoading(false);
-        }
+          return {
+            id: d.id,
+            client: data.name || data.client || "Client",
+            service: data.message || "Inquiry",
+            time: timeStr || "Recent",
+            status: data.isRead ? "Marked" : "New",
+            phone: data.phone || "",
+          };
+        });
+        setInquiries(loaded);
+        setInquiriesLoading(false);
       },
       (err) => {
-        console.error("Firestore inquiries listen error:", err);
+        console.error("Firestore leads listen error:", err);
         setInquiriesLoading(false);
       }
     );
@@ -277,6 +260,25 @@ export function RightResources({ onTabChange }: RightResourcesProps) {
             <Loader2 className="w-5 h-5 animate-spin text-[#FF272A]" />
             <span className="text-[11px] font-medium">Loading inquiries...</span>
           </div>
+        ) : inquiries.length === 0 ? (
+          <div
+            onClick={() => onTabChange?.("contacts")}
+            className="bg-[#f3f5f3] hover:bg-[#eaecea] rounded-[22px] p-5 flex flex-col items-center justify-center text-center border border-zinc-200/50 shadow-2xs py-7 cursor-pointer transition-all active:scale-[0.99] group"
+          >
+            <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center shadow-xs border border-zinc-200/60 mb-2.5 text-zinc-400 group-hover:scale-105 transition-transform">
+              <Inbox className="w-5 h-5 text-zinc-500 stroke-[1.8]" />
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white text-[10px] font-bold text-zinc-700 shadow-2xs border border-zinc-200/60 mb-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Inbox Clear
+            </span>
+            <h5 className="font-bold text-xs text-zinc-900 mt-0.5">
+              No Inbound Inquiries
+            </h5>
+            <p className="text-[11px] text-zinc-500 font-medium max-w-[210px] mt-1 leading-relaxed">
+              New client messages and booking requests from your website will appear here live.
+            </p>
+          </div>
         ) : (
           inquiries.map((item) => (
             <div
@@ -289,11 +291,18 @@ export function RightResources({ onTabChange }: RightResourcesProps) {
                   {item.client}
                 </span>
                 <span
-                  className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border shrink-0 ${getBadgeStyle(
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider border shrink-0 ${getBadgeStyle(
                     item.status
                   )}`}
                 >
-                  {item.status}
+                  {item.status.toLowerCase() === "marked" ||
+                  item.status.toLowerCase() === "read" ||
+                  item.status.toLowerCase() === "confirmed" ? (
+                    <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                  ) : (
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#FF272A] animate-pulse" />
+                  )}
+                  <span>{item.status}</span>
                 </span>
               </div>
 

@@ -1,103 +1,145 @@
 "use client";
 
-import React, { useState } from "react";
-import { BarChart3, ChevronDown, Calendar, DollarSign } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { BarChart3, ChevronDown, Calendar, Loader2 } from "lucide-react";
+import { db } from "@/lib/firebase";
+import { collection, onSnapshot } from "firebase/firestore";
 
-interface SalonDataPoint {
-  date: string;
-  dayLabel: string;
-  revenuePercent: number; // 0 to 1
-  bookingPercent: number; // 0 to 1
-  bookingsCount: number;
-  revenueAmount: number;
-  isPeakWeekend?: boolean;
-  activeLabel?: string;
-  revenueLabel?: string;
-  highlightDate?: boolean;
+interface ChartBarPoint {
+  id: string;
+  topLabel: string;
+  subLabel: string;
+  fullDateLabel: string;
+  count: number;
 }
 
-const SALON_CHART_DATA: SalonDataPoint[] = [
-  {
-    date: "19 Oct",
-    dayLabel: "Mon",
-    revenuePercent: 0.58,
-    bookingPercent: 0.35,
-    bookingsCount: 8,
-    revenueAmount: 1840,
-  },
-  {
-    date: "20 Oct",
-    dayLabel: "Tue",
-    revenuePercent: 0.65,
-    bookingPercent: 0.38,
-    bookingsCount: 10,
-    revenueAmount: 2150,
-  },
-  {
-    date: "21 Oct",
-    dayLabel: "Wed",
-    revenuePercent: 0.76,
-    bookingPercent: 0.42,
-    bookingsCount: 12,
-    revenueAmount: 2680,
-  },
-  {
-    date: "22 Oct",
-    dayLabel: "Thu",
-    revenuePercent: 0.82,
-    bookingPercent: 0.48,
-    bookingsCount: 14,
-    revenueAmount: 3120,
-  },
-  {
-    date: "23 Oct",
-    dayLabel: "Fri",
-    revenuePercent: 0.94,
-    bookingPercent: 0.62,
-    bookingsCount: 19,
-    revenueAmount: 4350,
-    activeLabel: "19 Bookings",
-    revenueLabel: "$4.3k",
-    highlightDate: true,
-  },
-  {
-    date: "24 Oct",
-    dayLabel: "Sat",
-    revenuePercent: 1.0,
-    bookingPercent: 0.75,
-    bookingsCount: 24,
-    revenueAmount: 5120,
-    isPeakWeekend: true,
-    activeLabel: "Bridal Peak",
-    revenueLabel: "$5.1k",
-    highlightDate: true,
-  },
-  {
-    date: "25 Oct",
-    dayLabel: "Sun",
-    revenuePercent: 0.88,
-    bookingPercent: 0.55,
-    bookingsCount: 16,
-    revenueAmount: 3890,
-  },
-  {
-    date: "26 Oct",
-    dayLabel: "Mon",
-    revenuePercent: 0.62,
-    bookingPercent: 0.36,
-    bookingsCount: 9,
-    revenueAmount: 1950,
-  },
-];
-
-const Y_TICKS = ["$5.0k", "$4.5k", "$4.0k", "$3.5k", "$3.0k", "$2.5k", "$2.0k", "$1.5k", "$1.0k", "$0.5k"];
-
 export function StatisticsChart() {
-  const [selectedPeriod, setSelectedPeriod] = useState("This Week (Oct 2026)");
+  const [timeframe, setTimeframe] = useState<"7days" | "6months">("7days");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Raw data from Firestore
+  const [dailyDataMap, setDailyDataMap] = useState<Record<string, number>>({});
+  const [monthlyDataMap, setMonthlyDataMap] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    // 1. Live listener for daily_lead_records
+    const unsubDaily = onSnapshot(
+      collection(db, "daily_lead_records"),
+      (snap) => {
+        const map: Record<string, number> = {};
+        snap.docs.forEach((docSnap) => {
+          const data = docSnap.data();
+          const count = Number(data.count) || 0;
+          // Document ID is "YYYY-MM-DD"
+          map[docSnap.id] = count;
+        });
+        setDailyDataMap(map);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Firestore daily_lead_records error:", err);
+        setLoading(false);
+      }
+    );
+
+    // 2. Live listener for monthly_lead_records
+    const unsubMonthly = onSnapshot(
+      collection(db, "monthly_lead_records"),
+      (snap) => {
+        const map: Record<string, number> = {};
+        snap.docs.forEach((docSnap) => {
+          const data = docSnap.data();
+          const count = Number(data.count) || 0;
+          // Document ID is "YYYY-MM"
+          map[docSnap.id] = count;
+        });
+        setMonthlyDataMap(map);
+      },
+      (err) => console.error("Firestore monthly_lead_records error:", err)
+    );
+
+    return () => {
+      unsubDaily();
+      unsubMonthly();
+    };
+  }, []);
+
+  // Compute 7 Days Data
+  const last7DaysData: ChartBarPoint[] = React.useMemo(() => {
+    const list: ChartBarPoint[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const key = `${year}-${month}-${day}`;
+
+      const topLabel = d.toLocaleDateString("en-US", { day: "numeric", month: "short" }); // e.g. "21 Oct"
+      const subLabel = d.toLocaleDateString("en-US", { weekday: "short" }); // e.g. "Wed"
+      const fullDateLabel = d.toLocaleDateString("en-US", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+
+      list.push({
+        id: key,
+        topLabel,
+        subLabel,
+        fullDateLabel,
+        count: dailyDataMap[key] || 0,
+      });
+    }
+    return list;
+  }, [dailyDataMap]);
+
+  // Compute 6 Months Data
+  const last6MonthsData: ChartBarPoint[] = React.useMemo(() => {
+    const list: ChartBarPoint[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const key = `${year}-${month}`;
+
+      const topLabel = d.toLocaleDateString("en-US", { month: "short" }); // e.g. "Oct"
+      const subLabel = String(year); // e.g. "2026"
+      const fullDateLabel = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+      list.push({
+        id: key,
+        topLabel,
+        subLabel,
+        fullDateLabel,
+        count: monthlyDataMap[key] || 0,
+      });
+    }
+    return list;
+  }, [monthlyDataMap]);
+
+  const activeData = timeframe === "7days" ? last7DaysData : last6MonthsData;
+
+  // Calculate dynamic Y-axis ticks
+  const maxCount = Math.max(...activeData.map((d) => d.count), 0);
+  const highestPeak = Math.max(maxCount, 10);
+  const roundCeiling = Math.ceil(highestPeak / 5) * 5;
+  const tickSteps = 5;
+  const yTicks = Array.from({ length: tickSteps + 1 }, (_, i) => {
+    return Math.round(roundCeiling - (i * roundCeiling) / tickSteps);
+  });
+
+  const peakItem = activeData.reduce(
+    (max, cur) => (cur.count > max.count ? cur : max),
+    activeData[0] || { count: 0 }
+  );
 
   return (
-    <div className="bg-[#f7f8f7] rounded-[30px] p-6 flex flex-col justify-between">
+    <div className="bg-[#f7f8f7] rounded-[30px] p-4 sm:p-6 flex flex-col justify-between">
       {/* Chart Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-6 flex-wrap">
@@ -107,137 +149,191 @@ export function StatisticsChart() {
             </div>
             <div>
               <h3 className="font-bold text-base sm:text-lg text-[#111215]">
-                Salon Bookings & Revenue
+                Leads &amp; Inquiries Activity
               </h3>
               <span className="text-[11px] text-zinc-500 font-medium">
-                Peak performance during bridal couture weekends
+                {timeframe === "7days"
+                  ? "Daily records across the last 7 days"
+                  : "Monthly volume trends across the last 6 months"}
               </span>
             </div>
           </div>
 
-          {/* Legends */}
-          <div className="flex items-center gap-4 text-xs font-semibold">
-            <div className="flex items-center gap-1.5 text-zinc-800">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#111215]" />
-              <span>Service Bookings</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-zinc-700">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#FF272A]" />
-              <span>Revenue Generated</span>
-            </div>
+          {/* Legend */}
+          <div className="flex items-center gap-2 text-xs font-semibold text-zinc-700">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#FF272A]" />
+            <span>Lead Inquiries</span>
           </div>
         </div>
 
-        {/* Period Selector */}
+        {/* Timeframe Period Selector Dropdown */}
         <div className="relative">
           <button
             type="button"
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-zinc-200/80 text-xs font-bold text-zinc-800 shadow-2xs hover:bg-zinc-50 transition cursor-pointer"
+            onClick={() => setIsDropdownOpen((prev) => !prev)}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-zinc-200/80 text-xs font-bold text-zinc-800 shadow-2xs hover:bg-zinc-50 transition cursor-pointer select-none"
           >
             <Calendar className="w-3.5 h-3.5 text-[#FF272A]" />
-            <span>{selectedPeriod}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+            <span>{timeframe === "7days" ? "Last 7 Days" : "Last 6 Months"}</span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${
+                isDropdownOpen ? "rotate-180" : ""
+              }`}
+            />
           </button>
+
+          {isDropdownOpen && (
+            <div className="absolute right-0 mt-1.5 w-44 bg-white rounded-2xl shadow-xl border border-zinc-100 p-1 z-30 animate-fadeIn select-none">
+              <button
+                type="button"
+                onClick={() => {
+                  setTimeframe("7days");
+                  setIsDropdownOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer ${
+                  timeframe === "7days"
+                    ? "bg-[#111215] text-white"
+                    : "text-zinc-700 hover:bg-zinc-100"
+                }`}
+              >
+                <span>Last 7 Days</span>
+                <span className="text-[10px] opacity-70">Daily</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTimeframe("6months");
+                  setIsDropdownOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer ${
+                  timeframe === "6months"
+                    ? "bg-[#111215] text-white"
+                    : "text-zinc-700 hover:bg-zinc-100"
+                }`}
+              >
+                <span>Last 6 Months</span>
+                <span className="text-[10px] opacity-70">Monthly</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Chart Body */}
-      <div className="relative flex gap-3 h-[240px] pt-4">
-        {/* Y Axis Labels */}
-        <div className="flex flex-col justify-between text-[11px] text-zinc-400 font-mono w-10 shrink-0 select-none pb-6">
-          {Y_TICKS.map((tick) => (
-            <span key={tick} className="leading-none text-right pr-1">
-              {tick}
-            </span>
-          ))}
+      {loading ? (
+        <div className="h-[240px] flex flex-col items-center justify-center text-zinc-400 gap-2">
+          <Loader2 className="w-6 h-6 animate-spin text-[#FF272A]" />
+          <span className="text-xs font-medium">Loading graph metrics...</span>
         </div>
-
-        {/* Plot Area with Grid Lines */}
-        <div className="relative flex-1 flex flex-col justify-between pb-6">
-          {/* Background Grid Lines */}
-          <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-6">
-            {Y_TICKS.map((tick) => (
-              <div key={tick} className="w-full border-b border-zinc-200/50" />
+      ) : (
+        <div className="relative flex gap-2 sm:gap-3 h-[240px] pt-4">
+          {/* Y Axis Labels */}
+          <div className="flex flex-col justify-between text-[11px] text-zinc-400 font-mono w-7 sm:w-8 shrink-0 select-none pb-6">
+            {yTicks.map((tick) => (
+              <span key={tick} className="leading-none text-right pr-1">
+                {tick}
+              </span>
             ))}
           </div>
 
-          {/* Bars Container */}
-          <div className="relative z-10 flex-1 grid grid-cols-8 items-end gap-1 sm:gap-4 h-full">
-            {SALON_CHART_DATA.map((item, index) => {
-              const isHovered = hoveredIndex === index;
-              const totalHeightPercent = item.revenuePercent * 100;
-              const bookingHeightPercent = (item.bookingPercent / item.revenuePercent) * 100;
+          {/* Plot Area with Grid Lines */}
+          <div className="relative flex-1 flex flex-col justify-between pb-6">
+            {/* Background Grid Lines */}
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-6">
+              {yTicks.map((tick) => (
+                <div key={tick} className="w-full border-b border-zinc-200/50" />
+              ))}
+            </div>
 
-              return (
-                <div
-                  key={item.date}
-                  className="flex flex-col items-center h-full justify-end relative group cursor-pointer"
-                  onMouseEnter={() => setHoveredIndex(index)}
-                  onMouseLeave={() => setHoveredIndex(null)}
-                >
-                  {/* Floating Tooltip On Hover */}
-                  {isHovered && (
-                    <div className="absolute -top-14 left-1/2 -translate-x-1/2 z-30 bg-[#161719] text-white px-3 py-1.5 rounded-xl shadow-xl text-center whitespace-nowrap pointer-events-none border border-zinc-800">
-                      <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
-                        {item.dayLabel}, {item.date}
-                      </div>
-                      <div className="text-xs font-black text-white">
-                        ${item.revenueAmount.toLocaleString()} • {item.bookingsCount} Appts
-                      </div>
-                    </div>
-                  )}
+            {/* Bars Container */}
+            <div
+              className={`relative z-10 flex-1 grid ${
+                timeframe === "7days" ? "grid-cols-7" : "grid-cols-6"
+              } items-end gap-1 sm:gap-4 h-full`}
+            >
+              {activeData.map((item, index) => {
+                const isHovered = hoveredIndex === index;
+                const isPeak =
+                  peakItem &&
+                  peakItem.count > 0 &&
+                  peakItem.id === item.id;
 
-                  {/* Static highlight badge (e.g., Friday & Saturday) */}
-                  {!isHovered && item.activeLabel && (
-                    <div className="absolute -top-3.5 sm:-top-4 left-1/2 -translate-x-1/2 z-20">
-                      <span className="px-2 py-0.5 rounded-full bg-[#111215] text-white text-[9px] sm:text-[10px] font-bold shadow-md whitespace-nowrap">
-                        {item.activeLabel}
-                      </span>
-                    </div>
-                  )}
+                // Scale bar height from 6% to 100%
+                const heightPercent =
+                  roundCeiling > 0
+                    ? Math.max((item.count / roundCeiling) * 100, item.count > 0 ? 14 : 5)
+                    : 5;
 
-                  {/* Main Pill Bar Container */}
+                return (
                   <div
-                    className={`w-6 sm:w-8 rounded-full overflow-hidden flex flex-col justify-between transition-all duration-200 shadow-xs ${
-                      isHovered ? "scale-105 shadow-md" : ""
-                    }`}
-                    style={{ height: `${totalHeightPercent}%` }}
+                    key={item.id}
+                    className="flex flex-col items-center h-full justify-end relative group cursor-pointer"
+                    onMouseEnter={() => setHoveredIndex(index)}
+                    onMouseLeave={() => setHoveredIndex(null)}
                   >
-                    {/* Top Segment: Total Bookings (Black) */}
-                    <div className="bg-[#111215] w-full flex-1 flex items-start justify-center pt-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-white shadow-2xs" />
-                    </div>
+                    {/* Floating Tooltip On Hover */}
+                    {isHovered && (
+                      <div className="absolute -top-14 left-1/2 -translate-x-1/2 z-30 bg-[#161719] text-white px-3 py-1.5 rounded-xl shadow-xl text-center whitespace-nowrap pointer-events-none border border-zinc-800">
+                        <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">
+                          {item.fullDateLabel}
+                        </div>
+                        <div className="text-xs font-black text-white">
+                          {item.count} Inbound {item.count === 1 ? "Lead" : "Leads"}
+                        </div>
+                      </div>
+                    )}
 
-                    {/* Bottom Segment: Revenue Generated (Brand Red #FF272A) */}
-                    <div
-                      className="bg-[#FF272A] w-full flex items-start justify-center pt-2 transition-all"
-                      style={{ height: `${bookingHeightPercent}%` }}
-                    >
-                      <span className="w-2.5 h-2.5 rounded-full bg-white" />
-                    </div>
+                    {/* Static highlight badge on the peak record */}
+                    {!isHovered && isPeak && (
+                      <div className="absolute -top-3.5 sm:-top-4 left-1/2 -translate-x-1/2 z-20">
+                        <span className="px-2 py-0.5 rounded-full bg-[#111215] text-white text-[9px] sm:text-[10px] font-bold shadow-md whitespace-nowrap">
+                          {item.count} Leads
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Main Capsule Pill Bar (Pure Red) */}
+                    {item.count === 0 ? (
+                      <div className="w-5 sm:w-8 h-2.5 rounded-full bg-zinc-300/80 transition-all" />
+                    ) : (
+                      <div
+                        className={`w-5 sm:w-8 rounded-full overflow-hidden flex flex-col items-center justify-start pt-2 bg-[#FF272A] transition-all duration-300 shadow-sm ${
+                          isHovered ? "scale-105 shadow-md brightness-110" : ""
+                        }`}
+                        style={{ height: `${heightPercent}%` }}
+                      >
+                        <span className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-white shadow-xs" />
+                      </div>
+                    )}
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
 
-          {/* X Axis Labels */}
-          <div className="grid grid-cols-8 gap-1 sm:gap-4 text-center mt-3 pt-2">
-            {SALON_CHART_DATA.map((item) => (
-              <div key={item.date} className="flex flex-col items-center">
-                <span
-                  className={`text-[11px] sm:text-xs truncate ${
-                    item.highlightDate ? "font-bold text-zinc-900" : "font-medium text-zinc-500"
-                  }`}
-                >
-                  {item.date}
-                </span>
-                <span className="text-[10px] text-zinc-400 font-semibold">{item.dayLabel}</span>
-              </div>
-            ))}
+            {/* X Axis Labels */}
+            <div
+              className={`grid ${
+                timeframe === "7days" ? "grid-cols-7" : "grid-cols-6"
+              } gap-1 sm:gap-4 text-center mt-3 pt-2`}
+            >
+              {activeData.map((item) => (
+                <div key={item.id} className="flex flex-col items-center">
+                  <span
+                    className={`text-[10px] sm:text-xs truncate ${
+                      item.count > 0 ? "font-bold text-zinc-900" : "font-medium text-zinc-500"
+                    }`}
+                  >
+                    {item.topLabel}
+                  </span>
+                  <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold truncate">
+                    {item.subLabel}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
