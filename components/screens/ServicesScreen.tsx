@@ -88,7 +88,7 @@ export function ServicesScreen() {
                 ? Number(data.maxPrice)
                 : undefined,
             duration: data.duration || "60 min",
-            image: data.image && data.image !== "/salon-hero.jpg" ? data.image : "",
+            image: data.image || "",
             cloudinaryPublicId: data.cloudinaryPublicId || "",
             description: data.description || "",
             createdAt,
@@ -131,7 +131,7 @@ export function ServicesScreen() {
               ? Number(data.maxPrice)
               : undefined,
           duration: data.duration || "60 min",
-          image: data.image && data.image !== "/salon-hero.jpg" ? data.image : "",
+          image: data.image || "",
           cloudinaryPublicId: data.cloudinaryPublicId || "",
           description: data.description || "",
           createdAt,
@@ -192,7 +192,7 @@ export function ServicesScreen() {
       price: service.price,
       maxPrice: service.maxPrice !== undefined ? service.maxPrice : "",
       duration: service.duration,
-      image: service.image && service.image !== "/salon-hero.jpg" ? service.image : "",
+      image: service.image || "",
       cloudinaryPublicId: service.cloudinaryPublicId || "",
       description: service.description,
     });
@@ -240,7 +240,7 @@ export function ServicesScreen() {
         price: priceNum,
         maxPrice: maxPriceNum,
         duration: formData.duration.trim() || "60 min",
-        image: formData.image && formData.image !== "/salon-hero.jpg" ? formData.image : "",
+        image: formData.image || "",
         cloudinaryPublicId: formData.cloudinaryPublicId || "",
         description: formData.description.trim(),
         updatedAt: serverTimestamp(),
@@ -356,7 +356,7 @@ export function ServicesScreen() {
             >
               {/* Left Side Image or Camera Placeholder */}
               <div className="relative w-24 sm:w-28 md:w-32 min-h-[105px] sm:min-h-[120px] rounded-xl overflow-hidden shrink-0 bg-zinc-100 flex items-center justify-center self-stretch border border-zinc-200/60">
-                {item.image && item.image !== "/salon-hero.jpg" ? (
+                {item.image ? (
                   <Image
                     src={item.image}
                     alt={item.name}
