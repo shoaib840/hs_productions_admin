@@ -13,6 +13,7 @@ import {
   Phone,
   Star,
   Tag,
+  Link2,
   LogOut,
   Menu,
   X,
@@ -85,6 +86,7 @@ export function Sidebar({ currentTab, onTabChange }: SidebarProps) {
     { id: "gallery", icon: Images, label: "Gallery" },
     { id: "about", icon: Info, label: "About Us" },
     { id: "contacts", icon: Phone, label: "Inquiries" },
+    { id: "quicklinks", icon: Link2, label: "Quick Links" },
   ];
 
   return (

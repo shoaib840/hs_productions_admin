@@ -9,6 +9,7 @@ export interface GalleryItem {
   imageUrl: string;
   cloudinaryPublicId?: string;
   createdAt?: number;
+  category?: "salon" | "photography";
 }
 
 const CACHE_KEY = "hs_studio_gallery_cache_v2";
@@ -24,8 +25,8 @@ let memoryHash: string = "";
  */
 export function computeGalleryHash(items: GalleryItem[]): string {
   if (!items || items.length === 0) return "empty";
-  // Hash based on count, first item, last item, and all item ids + updated times
-  return items.map((i) => `${i.id}_${i.imageUrl}_${i.createdAt || 0}`).join("|");
+  // Hash based on count, first item, last item, and all item ids + categories + updated times
+  return items.map((i) => `${i.id}_${i.imageUrl}_${i.category || "salon"}_${i.createdAt || 0}`).join("|");
 }
 
 /**

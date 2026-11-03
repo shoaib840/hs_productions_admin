@@ -84,11 +84,11 @@ function getBadgeStyle(status: string) {
 
 export function RightResources({ onTabChange }: RightResourcesProps) {
   // 1. Reviews State
-  const [reviewCount, setReviewCount] = useState<number>(18);
+  const [reviewCount, setReviewCount] = useState<number>(0);
   const [avgRating, setAvgRating] = useState<string>("5.0");
 
   // 2. Active Deals State
-  const [activeDealsCount, setActiveDealsCount] = useState<number>(4);
+  const [activeDealsCount, setActiveDealsCount] = useState<number>(0);
 
   // 3. Inquiries State
   const [inquiries, setInquiries] = useState<InquiryItem[]>(DEFAULT_INQUIRIES);
@@ -103,14 +103,12 @@ export function RightResources({ onTabChange }: RightResourcesProps) {
     const unsubReviews = onSnapshot(
       collection(db, "reviews"),
       (snap) => {
-        if (!snap.empty) {
-          const docs = snap.docs.map((d) => d.data());
-          const total = docs.length;
-          const sum = docs.reduce((acc, curr) => acc + (Number(curr.rating) || 5), 0);
-          const avg = total > 0 ? (sum / total).toFixed(1) : "5.0";
-          setReviewCount(total);
-          setAvgRating(avg);
-        }
+        const docs = snap.docs.map((d) => d.data());
+        const total = docs.length;
+        const sum = docs.reduce((acc, curr) => acc + (Number(curr.rating) || 5), 0);
+        const avg = total > 0 ? (sum / total).toFixed(1) : "5.0";
+        setReviewCount(total);
+        setAvgRating(avg);
       },
       (err) => console.error("Firestore reviews error:", err)
     );
@@ -119,13 +117,11 @@ export function RightResources({ onTabChange }: RightResourcesProps) {
     const unsubOffers = onSnapshot(
       collection(db, "offers"),
       (snap) => {
-        if (!snap.empty) {
-          const active = snap.docs.filter((d) => {
-            const data = d.data();
-            return data.status === "Active" || !data.status;
-          }).length;
-          setActiveDealsCount(active);
-        }
+        const active = snap.docs.filter((d) => {
+          const data = d.data();
+          return data.status === "Active" || !data.status;
+        }).length;
+        setActiveDealsCount(active);
       },
       (err) => console.error("Firestore offers error:", err)
     );

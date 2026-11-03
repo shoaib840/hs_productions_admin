@@ -5,6 +5,7 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY || "318535518357399",
   api_secret: process.env.CLOUDINARY_API_SECRET || "KjtvMp3mNoo3zHerYyt2AaqbAfc",
   secure: true,
+  timeout: 120000,
 });
 
 export default cloudinary;

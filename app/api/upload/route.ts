@@ -13,32 +13,38 @@ export async function POST(request: NextRequest) {
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    const mimeType = file.type || "image/webp";
+    const base64Data = `data:${mimeType};base64,${buffer.toString("base64")}`;
 
-    // Upload to Cloudinary using upload_stream
-    const result = await new Promise<{ secure_url: string; public_id: string }>(
-      (resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          {
-            folder: folder,
-            resource_type: "image",
-            format: "webp",
-          },
-          (error, result) => {
-            if (error || !result) {
-              reject(error);
-            } else {
-              resolve({
-                secure_url: result.secure_url,
-                public_id: result.public_id,
-              });
-            }
-          }
-        );
-        uploadStream.end(buffer);
+    // Direct base64 upload with extended timeout and retry
+    let result: any = null;
+    let lastError: any = null;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        result = await cloudinary.uploader.upload(base64Data, {
+          folder: folder,
+          resource_type: "image",
+          timeout: 120000,
+        });
+        if (result?.secure_url) break;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Cloudinary upload attempt ${attempt} failed:`, err?.message || err);
+        if (attempt < 2) {
+          await new Promise((res) => setTimeout(res, 1000));
+        }
       }
-    );
+    }
 
-    return NextResponse.json(result);
+    if (!result || !result.secure_url) {
+      throw lastError || new Error("Failed to upload image to Cloudinary");
+    }
+
+    return NextResponse.json({
+      secure_url: result.secure_url,
+      public_id: result.public_id,
+    });
   } catch (error: any) {
     console.error("Cloudinary upload error:", error);
     return NextResponse.json(

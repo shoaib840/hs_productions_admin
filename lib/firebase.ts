@@ -22,14 +22,22 @@ const auth: Auth = getAuth(app);
 const db: Firestore = getFirestore(app);
 const storage: FirebaseStorage = getStorage(app);
 
-// Initialize Analytics conditionally (only supported in client-side browser environments)
+// Initialize Analytics conditionally (only in browser, online, and production to avoid offline/ad-blocker errors)
 let analytics: Analytics | null = null;
-if (typeof window !== "undefined") {
-  isSupported().then((supported) => {
-    if (supported) {
-      analytics = getAnalytics(app);
-    }
-  });
+if (typeof window !== "undefined" && typeof navigator !== "undefined" && navigator.onLine && process.env.NODE_ENV === "production") {
+  isSupported()
+    .then((supported) => {
+      if (supported && navigator.onLine) {
+        try {
+          analytics = getAnalytics(app);
+        } catch {
+          // Suppress offline or blocked analytics errors
+        }
+      }
+    })
+    .catch(() => {
+      // Suppress unsupported environment errors
+    });
 }
 
 export { app, auth, db, storage, analytics, firebaseConfig };

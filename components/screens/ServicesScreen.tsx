@@ -25,6 +25,7 @@ interface Service {
   id: string;
   name: string;
   price: number;
+  maxPrice?: number;
   duration: string;
   image: string;
   cloudinaryPublicId?: string;
@@ -47,6 +48,7 @@ export function ServicesScreen() {
   const [formData, setFormData] = useState<{
     name: string;
     price: string | number;
+    maxPrice: string | number;
     duration: string;
     image: string;
     cloudinaryPublicId?: string;
@@ -54,6 +56,7 @@ export function ServicesScreen() {
   }>({
     name: "",
     price: "",
+    maxPrice: "",
     duration: "60 min",
     image: "",
     cloudinaryPublicId: "",
@@ -80,6 +83,10 @@ export function ServicesScreen() {
             id: d.id,
             name: data.name || "",
             price: Number(data.price) || 0,
+            maxPrice:
+              data.maxPrice !== undefined && data.maxPrice !== null && data.maxPrice !== ""
+                ? Number(data.maxPrice)
+                : undefined,
             duration: data.duration || "60 min",
             image: data.image || "/salon-hero.jpg",
             cloudinaryPublicId: data.cloudinaryPublicId || "",
@@ -119,6 +126,10 @@ export function ServicesScreen() {
           id: d.id,
           name: data.name || "",
           price: Number(data.price) || 0,
+          maxPrice:
+            data.maxPrice !== undefined && data.maxPrice !== null && data.maxPrice !== ""
+              ? Number(data.maxPrice)
+              : undefined,
           duration: data.duration || "60 min",
           image: data.image || "/salon-hero.jpg",
           cloudinaryPublicId: data.cloudinaryPublicId || "",
@@ -165,6 +176,7 @@ export function ServicesScreen() {
     setFormData({
       name: "",
       price: "",
+      maxPrice: "",
       duration: "60 min",
       image: "",
       cloudinaryPublicId: "",
@@ -178,6 +190,7 @@ export function ServicesScreen() {
     setFormData({
       name: service.name,
       price: service.price,
+      maxPrice: service.maxPrice !== undefined ? service.maxPrice : "",
       duration: service.duration,
       image: service.image,
       cloudinaryPublicId: service.cloudinaryPublicId || "",
@@ -209,29 +222,37 @@ export function ServicesScreen() {
     e.preventDefault();
     if (!formData.name.trim() || isSaving) return;
 
+    const priceNum = Number(formData.price) || 0;
+    const maxPriceNum =
+      formData.maxPrice !== "" && Number(formData.maxPrice) > 0
+        ? Number(formData.maxPrice)
+        : null;
+
+    if (maxPriceNum !== null && maxPriceNum < priceNum) {
+      alert("Max price (Price To) cannot be less than Min price (Price From).");
+      return;
+    }
+
     setIsSaving(true);
     try {
+      const payload: Record<string, any> = {
+        name: formData.name.trim(),
+        price: priceNum,
+        maxPrice: maxPriceNum,
+        duration: formData.duration.trim() || "60 min",
+        image: formData.image || "/salon-hero.jpg",
+        cloudinaryPublicId: formData.cloudinaryPublicId || "",
+        description: formData.description.trim(),
+        updatedAt: serverTimestamp(),
+      };
+
       if (editingService) {
         const serviceRef = doc(db, "services", editingService.id);
-        await updateDoc(serviceRef, {
-          name: formData.name.trim(),
-          price: Number(formData.price),
-          duration: formData.duration.trim() || "60 min",
-          image: formData.image || "/salon-hero.jpg",
-          cloudinaryPublicId: formData.cloudinaryPublicId || "",
-          description: formData.description.trim(),
-          updatedAt: serverTimestamp(),
-        });
+        await updateDoc(serviceRef, payload);
       } else {
         await addDoc(collection(db, "services"), {
-          name: formData.name.trim(),
-          price: Number(formData.price),
-          duration: formData.duration.trim() || "60 min",
-          image: formData.image || "/salon-hero.jpg",
-          cloudinaryPublicId: formData.cloudinaryPublicId || "",
-          description: formData.description.trim(),
+          ...payload,
           createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
         });
       }
       setIsModalOpen(false);
@@ -358,7 +379,11 @@ export function ServicesScreen() {
 
                 <div className="pt-2 sm:pt-3 mt-2 border-t border-zinc-100 flex items-center justify-between gap-1 flex-wrap">
                   <div>
-                    <span className="text-base sm:text-lg font-black text-zinc-900">Rs.{item.price}</span>
+                    <span className="text-base sm:text-lg font-black text-zinc-900">
+                      {item.maxPrice && item.maxPrice > item.price
+                        ? `Rs.${item.price.toLocaleString()} - ${item.maxPrice.toLocaleString()}`
+                        : `Rs.${item.price.toLocaleString()}`}
+                    </span>
                     <span className="text-[10px] sm:text-[11px] text-zinc-400 ml-1">/ {item.duration}</span>
                   </div>
 
@@ -431,17 +456,17 @@ export function ServicesScreen() {
                 />
               </div>
 
-              {/* Price & Duration */}
+              {/* Pricing (From - To) */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-zinc-800">
-                    Price (Rs) <span className="text-[#FF272A]">*</span>
+                    Price From (Rs) <span className="text-[#FF272A]">*</span>
                   </label>
                   <input
                     type="number"
                     required
-                    min={1}
-                    placeholder="e.g. 1500"
+                    min={0}
+                    placeholder="e.g. 1000"
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                     className="px-3.5 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF272A]/30 focus:border-[#FF272A]"
@@ -449,18 +474,34 @@ export function ServicesScreen() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-zinc-800">
-                    Duration <span className="text-[#FF272A]">*</span>
+                  <label className="text-xs font-semibold text-zinc-800 flex items-center justify-between">
+                    <span>Price To (Rs)</span>
+                    <span className="text-[10px] text-zinc-400 font-normal">Optional</span>
                   </label>
                   <input
-                    type="text"
-                    required
-                    placeholder="e.g. 60 min"
-                    value={formData.duration}
-                    onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                    type="number"
+                    min={0}
+                    placeholder="e.g. 5000"
+                    value={formData.maxPrice}
+                    onChange={(e) => setFormData({ ...formData, maxPrice: e.target.value })}
                     className="px-3.5 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF272A]/30 focus:border-[#FF272A]"
                   />
                 </div>
+              </div>
+
+              {/* Duration */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-zinc-800">
+                  Duration <span className="text-[#FF272A]">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 3 hours or 60 min"
+                  value={formData.duration}
+                  onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                  className="px-3.5 py-2 rounded-xl bg-zinc-50 border border-zinc-200 text-sm text-zinc-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#FF272A]/30 focus:border-[#FF272A]"
+                />
               </div>
 
               {/* Service Image (Upload from Laptop / Mobile Gallery) */}

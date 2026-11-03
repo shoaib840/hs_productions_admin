@@ -13,6 +13,8 @@ import {
   ChevronRight,
   Loader2,
   RefreshCw,
+  Camera,
+  Sparkles,
 } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
@@ -23,6 +25,7 @@ import {
   getDoc,
   getDocs,
   setDoc,
+  deleteDoc,
   collection,
   writeBatch,
 } from "firebase/firestore";
@@ -38,61 +41,79 @@ import {
   computeGalleryHash,
 } from "@/lib/galleryCache";
 
+function parseImages(raw: any[], category: "salon" | "photography"): GalleryItem[] {
+  return (raw || [])
+    .map((img: any, idx: number) => ({
+      id: img.id || `${Date.now()}-${idx}`,
+      imageUrl:
+        typeof img.imageUrl === "string"
+          ? img.imageUrl.trim()
+          : typeof img === "string"
+            ? img
+            : "",
+      cloudinaryPublicId: img.cloudinaryPublicId || "",
+      category,
+      createdAt: img.createdAt || 0,
+    }))
+    .filter((item: GalleryItem) => Boolean(item.imageUrl && item.imageUrl.length > 0))
+    .sort((a: GalleryItem, b: GalleryItem) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+}
+
 export function GalleryScreen() {
-  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>(() => {
+  const [salonItems, setSalonItems] = useState<GalleryItem[]>(() => {
     const cached = getCachedGallery();
-    return cached ? cached.items : [];
+    return cached ? cached.items.filter((i) => i.category !== "photography") : [];
+  });
+  const [photographyItems, setPhotographyItems] = useState<GalleryItem[]>(() => {
+    const cached = getCachedGallery();
+    return cached ? cached.items.filter((i) => i.category === "photography") : [];
   });
   const [isLoading, setIsLoading] = useState<boolean>(() => {
     const cached = getCachedGallery();
     return !cached || cached.items.length === 0;
   });
+
+  // Section Tab Filter: "salon" | "photography"
+  const [activeSection, setActiveSection] = useState<"salon" | "photography">("salon");
+
+  // Upload modal state
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
+  const [uploadCategory, setUploadCategory] = useState<"salon" | "photography">("salon");
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadedPreviews, setUploadedPreviews] = useState<string[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [previewItem, setPreviewItem] = useState<GalleryItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Deletion modal state
   const [deleteTarget, setDeleteTarget] = useState<{
-    type: "single" | "all";
+    type: "single" | "section" | "all";
     item?: GalleryItem;
+    category?: "salon" | "photography";
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  const viewingList = activeSection === "salon" ? salonItems : photographyItems;
 
   // Manual re-sync from server to force refresh stale cache
   const handleSync = async () => {
     if (isSyncing) return;
     setIsSyncing(true);
     try {
-      const singleDocRef = doc(db, "gallery", "gallery");
-      const docSnap = await getDoc(singleDocRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const rawImages: any[] = data.images || data.items || [];
-        const items: GalleryItem[] = rawImages
-          .map((img: any, idx: number) => ({
-            id: img.id || `${Date.now()}-${idx}`,
-            imageUrl:
-              typeof img.imageUrl === "string"
-                ? img.imageUrl.trim()
-                : typeof img === "string"
-                  ? img
-                  : "",
-            cloudinaryPublicId: img.cloudinaryPublicId || "",
-            createdAt: img.createdAt || 0,
-          }))
-          .filter((item) => Boolean(item.imageUrl && item.imageUrl.length > 0));
+      const salonRef = doc(db, "gallery", "salon");
+      const photoRef = doc(db, "gallery", "photography");
+      const [salonSnap, photoSnap] = await Promise.all([
+        getDoc(salonRef),
+        getDoc(photoRef),
+      ]);
 
-        items.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-        setCachedGallery(items);
-        setGalleryItems(items);
-      } else {
-        clearGalleryCache();
-        setGalleryItems([]);
-      }
+      const sItems = salonSnap.exists() ? parseImages(salonSnap.data().images, "salon") : [];
+      const pItems = photoSnap.exists() ? parseImages(photoSnap.data().images, "photography") : [];
+
+      setSalonItems(sItems);
+      setPhotographyItems(pItems);
+      setCachedGallery([...sItems, ...pItems]);
     } catch (err) {
       console.error("Manual sync failed:", err);
     } finally {
@@ -100,125 +121,104 @@ export function GalleryScreen() {
     }
   };
 
-  // Real-time listener for the single "gallery" document in "gallery" collection
+  // Real-time listeners for 2 separate Firestore documents: "salon" and "photography"
   useEffect(() => {
-    const cached = getCachedGallery();
-    if (!cached || cached.items.length === 0) {
-      setIsLoading(true);
-    }
+    const salonRef = doc(db, "gallery", "salon");
+    const photoRef = doc(db, "gallery", "photography");
+    const legacyRef = doc(db, "gallery", "gallery");
 
-    const singleDocRef = doc(db, "gallery", "gallery");
+    // Auto-migrate legacy single document "gallery/gallery" into 2 documents ("salon" and "photography")
+    const migrateLegacy = async () => {
+      try {
+        const legacySnap = await getDoc(legacyRef);
+        if (legacySnap.exists()) {
+          const raw = legacySnap.data().images || legacySnap.data().items || [];
+          const sImgs = raw.filter((i: any) => i.category !== "photography");
+          const pImgs = raw.filter((i: any) => i.category === "photography");
 
-    const unsubscribe = onSnapshot(
-      singleDocRef,
-      async (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const rawImages: any[] = data.images || data.items || [];
-          const items: GalleryItem[] = rawImages
-            .map((img: any, idx: number) => ({
-              id: img.id || `${Date.now()}-${idx}`,
-              imageUrl:
-                typeof img.imageUrl === "string"
-                  ? img.imageUrl.trim()
-                  : typeof img === "string"
-                    ? img
-                    : "",
-              cloudinaryPublicId: img.cloudinaryPublicId || "",
-              createdAt: img.createdAt || 0,
-            }))
-            .filter((item) => Boolean(item.imageUrl && item.imageUrl.length > 0));
-
-          items.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-
-          // Only update state if Firebase data has actually changed compared to cache
-          const newHash = computeGalleryHash(items);
-          const currentCached = getCachedGallery();
-
-          if (!currentCached || currentCached.hash !== newHash) {
-            setCachedGallery(items);
-            setGalleryItems(items);
-          }
-          setIsLoading(false);
-        } else {
-          // If single document does not exist yet, check for legacy separate documents in "gallery" and auto-migrate
-          try {
-            const legacySnapshot = await getDocs(collection(db, "gallery"));
-            const legacyDocs = legacySnapshot.docs.filter((d) => d.id !== "gallery");
-
-            if (legacyDocs.length > 0) {
-              const migratedList: GalleryItem[] = legacyDocs
-                .map((d) => {
-                  const data = d.data();
-                  const url =
-                    data.imageUrl ||
-                    data.url ||
-                    data.image ||
-                    data.photoUrl ||
-                    data.downloadUrl ||
-                    "";
-                  return {
-                    id: d.id,
-                    imageUrl: typeof url === "string" ? url.trim() : "",
-                    cloudinaryPublicId: data.cloudinaryPublicId || "",
-                    createdAt: data.createdAt || 0,
-                  };
-                })
-                .filter((item) => Boolean(item.imageUrl && item.imageUrl.length > 0));
-
-              migratedList.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-
-              // Store into single document "gallery/gallery"
-              await setDoc(singleDocRef, { images: migratedList });
-
-              // Delete old individual legacy docs
-              const batch = writeBatch(db);
-              legacyDocs.forEach((d) => batch.delete(d.ref));
-              await batch.commit();
-
-              setCachedGallery(migratedList);
-              setGalleryItems(migratedList);
-            } else {
-              clearGalleryCache();
-              setGalleryItems([]);
-            }
-          } catch (migrateErr) {
-            console.error("Migration error:", migrateErr);
-            setGalleryItems([]);
-          } finally {
-            setIsLoading(false);
-          }
+          await setDoc(salonRef, { images: sImgs }, { merge: true });
+          await setDoc(photoRef, { images: pImgs }, { merge: true });
+          await deleteDoc(legacyRef);
         }
-      },
-      (error) => {
-        console.error("Firebase Firestore single document fetch error:", error);
-        setIsLoading(false);
+      } catch (err) {
+        console.error("Migration error:", err);
       }
-    );
+    };
+    migrateLegacy();
 
-    return () => unsubscribe();
+    // Listen to Document 1: "gallery/salon"
+    const unsubSalon = onSnapshot(salonRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const s = parseImages(docSnap.data().images, "salon");
+        setSalonItems(s);
+      } else {
+        setSalonItems([]);
+      }
+      setIsLoading(false);
+    });
+
+    // Listen to Document 2: "gallery/photography"
+    const unsubPhoto = onSnapshot(photoRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const p = parseImages(docSnap.data().images, "photography");
+        setPhotographyItems(p);
+      } else {
+        setPhotographyItems([]);
+      }
+      setIsLoading(false);
+    });
+
+    return () => {
+      unsubSalon();
+      unsubPhoto();
+    };
   }, []);
+
+  // Update gallery cache whenever items change
+  useEffect(() => {
+    const combined = [...salonItems, ...photographyItems];
+    if (combined.length > 0) {
+      setCachedGallery(combined);
+    }
+  }, [salonItems, photographyItems]);
 
   // Keyboard navigation for fullscreen lightbox
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (previewIndex === null) return;
+      if (!previewItem) return;
       if (e.key === "Escape") {
-        setPreviewIndex(null);
+        setPreviewItem(null);
       } else if (e.key === "ArrowRight") {
-        setPreviewIndex((prev) =>
-          prev === null ? null : (prev + 1) % galleryItems.length
-        );
+        const curIdx = viewingList.findIndex((i) => i.id === previewItem.id);
+        if (curIdx !== -1 && viewingList.length > 0) {
+          setPreviewItem(viewingList[(curIdx + 1) % viewingList.length]);
+        }
       } else if (e.key === "ArrowLeft") {
-        setPreviewIndex((prev) =>
-          prev === null ? null : (prev - 1 + galleryItems.length) % galleryItems.length
-        );
+        const curIdx = viewingList.findIndex((i) => i.id === previewItem.id);
+        if (curIdx !== -1 && viewingList.length > 0) {
+          setPreviewItem(
+            viewingList[(curIdx - 1 + viewingList.length) % viewingList.length]
+          );
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [previewIndex, galleryItems.length]);
+  }, [previewItem, viewingList]);
+
+  const handleOpenUpload = (category?: "salon" | "photography") => {
+    setUploadedPreviews([]);
+    setSelectedFiles([]);
+    if (category) {
+      setUploadCategory(category);
+    } else if (activeSection === "photography") {
+      setUploadCategory("photography");
+    } else {
+      setUploadCategory("salon");
+    }
+    setIsUploadOpen(true);
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -267,28 +267,33 @@ export function GalleryScreen() {
       for (let i = 0; i < selectedFiles.length; i++) {
         const file = selectedFiles[i];
         // Uploads image to Cloudinary in WebP format compressed to <= 100 KB
-        const { url, publicId } = await uploadImageToCloudinary(file, "hs_lookbook");
+        const folder = uploadCategory === "photography" ? "hs_photography" : "hs_lookbook";
+        const { url, publicId } = await uploadImageToCloudinary(file, folder);
 
         newItems.push({
           id: `${Date.now()}-${i}-${Math.random().toString(36).substring(2, 7)}`,
           imageUrl: url,
           cloudinaryPublicId: publicId,
+          category: uploadCategory,
           createdAt: Date.now() + i,
         });
       }
 
-      // Read current single doc and prepend new items into map list
-      const singleDocRef = doc(db, "gallery", "gallery");
-      const docSnap = await getDoc(singleDocRef);
+      // Read current document for the selected category ("salon" or "photography")
+      const targetDocRef = doc(db, "gallery", uploadCategory);
+      const docSnap = await getDoc(targetDocRef);
       const currentList: GalleryItem[] = docSnap.exists()
-        ? docSnap.data().images || []
-        : galleryItems;
+        ? parseImages(docSnap.data().images, uploadCategory)
+        : [];
 
       const updatedList = [...newItems, ...currentList];
-      await setDoc(singleDocRef, { images: updatedList }, { merge: true });
+      await setDoc(targetDocRef, { images: updatedList });
 
-      setCachedGallery(updatedList);
-      setGalleryItems(updatedList);
+      if (uploadCategory === "salon") {
+        setSalonItems(updatedList);
+      } else {
+        setPhotographyItems(updatedList);
+      }
 
       setUploadedPreviews([]);
       setSelectedFiles([]);
@@ -306,42 +311,63 @@ export function GalleryScreen() {
     setIsDeleting(true);
 
     try {
-      const singleDocRef = doc(db, "gallery", "gallery");
-
       if (deleteTarget.type === "single" && deleteTarget.item) {
         const item = deleteTarget.item;
-        const docSnap = await getDoc(singleDocRef);
+        const targetCategory = item.category === "photography" ? "photography" : "salon";
+        const targetDocRef = doc(db, "gallery", targetCategory);
+        const docSnap = await getDoc(targetDocRef);
         const currentList: GalleryItem[] = docSnap.exists()
-          ? docSnap.data().images || []
-          : galleryItems;
+          ? parseImages(docSnap.data().images, targetCategory)
+          : [];
         const updatedList = currentList.filter((i) => i.id !== item.id);
-        await setDoc(singleDocRef, { images: updatedList });
-        setCachedGallery(updatedList);
-        setGalleryItems(updatedList);
+        await setDoc(targetDocRef, { images: updatedList });
+
+        if (targetCategory === "salon") {
+          setSalonItems(updatedList);
+        } else {
+          setPhotographyItems(updatedList);
+        }
 
         if (item.cloudinaryPublicId) {
           await deleteImageFromCloudinary(item.cloudinaryPublicId);
         }
-        if (previewIndex !== null) setPreviewIndex(null);
-      } else if (deleteTarget.type === "all") {
-        for (const item of galleryItems) {
+        if (previewItem?.id === item.id) setPreviewItem(null);
+      } else if (deleteTarget.type === "section" && deleteTarget.category) {
+        const cat = deleteTarget.category;
+        const targetDocRef = doc(db, "gallery", cat);
+        const itemsToDelete = cat === "salon" ? salonItems : photographyItems;
+
+        for (const item of itemsToDelete) {
           if (item.cloudinaryPublicId) {
             await deleteImageFromCloudinary(item.cloudinaryPublicId);
           }
         }
-        await setDoc(singleDocRef, { images: [] });
+        await setDoc(targetDocRef, { images: [] });
+
+        if (cat === "salon") {
+          setSalonItems([]);
+        } else {
+          setPhotographyItems([]);
+        }
+
+        if (previewItem && itemsToDelete.some((i) => i.id === previewItem.id)) {
+          setPreviewItem(null);
+        }
+      } else if (deleteTarget.type === "all") {
+        // Clear both doc 1 ("salon") and doc 2 ("photography")
+        for (const item of [...salonItems, ...photographyItems]) {
+          if (item.cloudinaryPublicId) {
+            await deleteImageFromCloudinary(item.cloudinaryPublicId);
+          }
+        }
+        await Promise.all([
+          setDoc(doc(db, "gallery", "salon"), { images: [] }),
+          setDoc(doc(db, "gallery", "photography"), { images: [] }),
+        ]);
+        setSalonItems([]);
+        setPhotographyItems([]);
         clearGalleryCache();
-        setGalleryItems([]);
-
-        // Clean up any loose legacy documents in collection
-        const legacySnapshot = await getDocs(collection(db, "gallery"));
-        const batch = writeBatch(db);
-        legacySnapshot.docs.forEach((d) => {
-          if (d.id !== "gallery") batch.delete(d.ref);
-        });
-        await batch.commit();
-
-        if (previewIndex !== null) setPreviewIndex(null);
+        if (previewItem !== null) setPreviewItem(null);
       }
     } catch (err) {
       console.error("Error deleting photos:", err);
@@ -349,6 +375,68 @@ export function GalleryScreen() {
       setIsDeleting(false);
       setDeleteTarget(null);
     }
+  };
+
+  // Helper renderer for a photo grid section
+  const renderSectionGrid = (items: GalleryItem[], category: "salon" | "photography") => {
+    if (items.length === 0) {
+      return (
+        <EmptyState
+          icon={Images}
+          badge="Gallery Empty"
+          title="No Photos in Gallery Yet"
+          description={
+            category === "salon"
+              ? "Your studio lookbook is currently empty. Upload photos from your laptop or mobile to showcase your salon portfolio."
+              : "Your studio lookbook is currently empty. Upload photos from your laptop or mobile to showcase your photography portfolio."
+          }
+          actionLabel="Upload New Look"
+          onAction={() => handleOpenUpload(category)}
+        />
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 sm:gap-4">
+        {items.map((item) => (
+          <div
+            key={item.id}
+            onClick={() => setPreviewItem(item)}
+            title="Click to view full screen"
+            className="group relative aspect-square w-full rounded-2xl overflow-hidden border border-zinc-200/80 bg-zinc-100 shadow-xs hover:shadow-xl transition-all duration-300 cursor-zoom-in"
+          >
+            {item.imageUrl ? (
+              <Image
+                src={item.imageUrl}
+                alt={category === "salon" ? "Salon Look" : "Photography Shoot"}
+                fill
+                unoptimized
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
+                className="object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            ) : null}
+
+            {/* Category Pill on hover */}
+            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-xs text-[10px] font-semibold text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              {item.category === "photography" ? "Photography" : "Salon Look"}
+            </div>
+
+            {/* Individual Delete Icon */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteTarget({ type: "single", item });
+              }}
+              title="Delete photo"
+              className="absolute top-2 right-2 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black/65 hover:bg-[#FF272A] text-white flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all shadow-md backdrop-blur-xs cursor-pointer z-10 active:scale-95"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -369,7 +457,7 @@ export function GalleryScreen() {
             <span className="hidden sm:inline">Studio Gallery & Lookbook</span>
           </h1>
 
-          {/* Action Buttons Aligned with Main Text */}
+          {/* Action Buttons */}
           <div className="flex items-center gap-2 shrink-0">
             {/* Sync Button */}
             <button
@@ -380,49 +468,101 @@ export function GalleryScreen() {
               className="flex items-center justify-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-full border border-zinc-200/90 bg-white hover:bg-zinc-50 text-zinc-700 font-semibold text-xs transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-60 group"
             >
               <RefreshCw
-                className={`w-3.5 h-3.5 text-zinc-600 transition-transform ${isSyncing ? "animate-spin text-[#FF272A]" : "group-hover:rotate-45"
-                  }`}
+                className={`w-3.5 h-3.5 text-zinc-600 transition-transform ${
+                  isSyncing ? "animate-spin text-[#FF272A]" : "group-hover:rotate-45"
+                }`}
               />
               <span className="hidden xs:inline">
                 {isSyncing ? "Syncing..." : "Sync"}
               </span>
             </button>
-            {galleryItems.length > 0 && (
+
+            {viewingList.length > 0 && (
               <button
                 type="button"
-                onClick={() => setDeleteTarget({ type: "all" })}
-                title="Delete all photos"
-                className="flex items-center justify-center gap-1.5 px-3 py-2 sm:px-4 sm:py-2.5 rounded-full border border-red-200 bg-red-50/70 hover:bg-red-100 text-[#FF272A] font-semibold text-xs transition-all shadow-xs cursor-pointer group"
+                onClick={() =>
+                  setDeleteTarget({
+                    type: "section",
+                    category: activeSection,
+                  })
+                }
+                title={`Delete all ${activeSection === "salon" ? "salon" : "photography"} photos`}
+                className="flex items-center justify-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2.5 rounded-full border border-red-200 bg-red-50/70 hover:bg-red-100 text-[#FF272A] font-semibold text-xs transition-all shadow-xs cursor-pointer group"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden xs:inline">Delete All</span>
+                <span className="hidden xs:inline">
+                  {activeSection === "salon" ? "Clear Salon" : "Clear Photography"}
+                </span>
               </button>
             )}
 
             <button
               type="button"
-              onClick={() => {
-                setUploadedPreviews([]);
-                setSelectedFiles([]);
-                setIsUploadOpen(true);
-              }}
+              onClick={() => handleOpenUpload()}
               className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-full bg-[#161719] text-white hover:bg-black transition-all shadow-md font-medium sm:font-semibold text-[11px] sm:text-xs cursor-pointer group hover:scale-[1.02]"
             >
               <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF272A] group-hover:-translate-y-0.5 transition-transform" />
               <span>
-                <span className="sm:hidden">Upload New</span>
-                <span className="hidden sm:inline">Upload New Look</span>
+                <span className="sm:hidden">Upload</span>
+                <span className="hidden sm:inline">
+                  {activeSection === "salon" ? "Upload to Salon" : "Upload to Photography"}
+                </span>
               </span>
             </button>
           </div>
         </div>
 
         <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
-          Curated high-fashion cuts, color transformations, and bridal portfolio highlights.
+          {activeSection === "salon"
+            ? "Curated salon cuts, color transformations, bridal styling, and studio lookbook."
+            : "Studio portraits, bridal photoshoots, event photography, and client albums."}
         </p>
       </div>
 
-      {/* Grid or Empty State or Loading State */}
+      {/* Section Switcher Tabs (Only 2 Sections) */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <button
+          type="button"
+          onClick={() => setActiveSection("salon")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeSection === "salon"
+              ? "bg-[#FF272A] text-white shadow-sm shadow-[#FF272A]/20"
+              : "bg-white border border-zinc-200/90 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Salon Gallery</span>
+          <span
+            className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+              activeSection === "salon" ? "bg-white/20 text-white" : "bg-zinc-100 text-zinc-600"
+            }`}
+          >
+            {salonItems.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSection("photography")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+            activeSection === "photography"
+              ? "bg-[#FF272A] text-white shadow-sm shadow-[#FF272A]/20"
+              : "bg-white border border-zinc-200/90 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+          }`}
+        >
+          <Camera className="w-3.5 h-3.5" />
+          <span>Photography</span>
+          <span
+            className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+              activeSection === "photography" ? "bg-white/20 text-white" : "bg-zinc-100 text-zinc-600"
+            }`}
+          >
+            {photographyItems.length}
+          </span>
+        </button>
+      </div>
+
+      {/* Loading Skeleton */}
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {[...Array(10)].map((_, i) => (
@@ -432,70 +572,33 @@ export function GalleryScreen() {
             />
           ))}
         </div>
-      ) : galleryItems.length === 0 ? (
-        <EmptyState
-          icon={Images}
-          badge="Gallery Empty"
-          title="No Photos in Gallery Yet"
-          description="Your studio lookbook is currently empty. Upload photos from your laptop or mobile to showcase your salon portfolio."
-          actionLabel="Upload New Look"
-          onAction={() => {
-            setUploadedPreviews([]);
-            setSelectedFiles([]);
-            setIsUploadOpen(true);
-          }}
-        />
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {galleryItems.map((item, idx) => (
-            <div
-              key={item.id}
-              onClick={() => setPreviewIndex(idx)}
-              title="Click to view full screen"
-              className="group relative aspect-square w-full rounded-2xl overflow-hidden border border-zinc-200/80 bg-zinc-100 shadow-xs hover:shadow-xl transition-all duration-300 cursor-zoom-in"
-            >
-              {item.imageUrl ? (
-                <Image
-                  src={item.imageUrl}
-                  alt="Studio Look"
-                  fill
-                  unoptimized
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
-                  className="object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-              ) : null}
-
-              {/* Individual Delete Icon: Always visible on mobile, hover on desktop */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeleteTarget({ type: "single", item });
-                }}
-                title="Delete photo"
-                className="absolute top-2 right-2 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-black/65 hover:bg-[#FF272A] text-white flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all shadow-md backdrop-blur-xs cursor-pointer z-10 active:scale-95"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
+        <div>
+          {activeSection === "salon"
+            ? renderSectionGrid(salonItems, "salon")
+            : renderSectionGrid(photographyItems, "photography")}
         </div>
       )}
 
       {/* Fullscreen Image Lightbox Modal */}
-      {previewIndex !== null && galleryItems[previewIndex]?.imageUrl && (
+      {previewItem !== null && previewItem.imageUrl && (
         <div
           className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 sm:p-8 animate-fadeIn select-none"
-          onClick={() => setPreviewIndex(null)}
+          onClick={() => setPreviewItem(null)}
         >
-          {/* Top Bar: Counter & Close */}
+          {/* Top Bar: Counter, Badge & Close */}
           <div className="absolute top-5 left-6 right-6 flex items-center justify-between text-white z-50">
-            <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10">
-              {previewIndex + 1} / {galleryItems.length}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10">
+                {viewingList.findIndex((i) => i.id === previewItem.id) + 1} / {viewingList.length}
+              </span>
+              <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-[#FF272A]/80 backdrop-blur-md text-white border border-[#FF272A]">
+                {previewItem.category === "photography" ? "Photography" : "Salon Gallery"}
+              </span>
+            </div>
             <button
               type="button"
-              onClick={() => setPreviewIndex(null)}
+              onClick={() => setPreviewItem(null)}
               title="Close fullscreen view (Esc)"
               className="w-10 h-10 rounded-full bg-white/10 hover:bg-[#FF272A] text-white flex items-center justify-center transition-colors cursor-pointer border border-white/10 shadow-lg"
             >
@@ -504,14 +607,17 @@ export function GalleryScreen() {
           </div>
 
           {/* Previous Button */}
-          {galleryItems.length > 1 && (
+          {viewingList.length > 1 && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setPreviewIndex((prev) =>
-                  prev === null ? null : (prev - 1 + galleryItems.length) % galleryItems.length
-                );
+                const curIdx = viewingList.findIndex((i) => i.id === previewItem.id);
+                if (curIdx !== -1) {
+                  setPreviewItem(
+                    viewingList[(curIdx - 1 + viewingList.length) % viewingList.length]
+                  );
+                }
               }}
               title="Previous photo (←)"
               className="absolute left-4 sm:left-8 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/50 hover:bg-[#FF272A] text-white flex items-center justify-center transition-colors cursor-pointer border border-white/10 shadow-xl z-50 backdrop-blur-xs"
@@ -526,7 +632,7 @@ export function GalleryScreen() {
             onClick={(e) => e.stopPropagation()}
           >
             <Image
-              src={galleryItems[previewIndex].imageUrl}
+              src={previewItem.imageUrl}
               alt="Fullscreen Studio Look"
               fill
               unoptimized
@@ -536,14 +642,17 @@ export function GalleryScreen() {
           </div>
 
           {/* Next Button */}
-          {galleryItems.length > 1 && (
+          {viewingList.length > 1 && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setPreviewIndex((prev) =>
-                  prev === null ? null : (prev + 1) % galleryItems.length
-                );
+                const curIdx = viewingList.findIndex((i) => i.id === previewItem.id);
+                if (curIdx !== -1) {
+                  setPreviewItem(
+                    viewingList[(curIdx + 1) % viewingList.length]
+                  );
+                }
               }}
               title="Next photo (→)"
               className="absolute right-4 sm:right-8 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/50 hover:bg-[#FF272A] text-white flex items-center justify-center transition-colors cursor-pointer border border-white/10 shadow-xl z-50 backdrop-blur-xs"
@@ -571,7 +680,7 @@ export function GalleryScreen() {
                   Cloudinary WebP Lookbook
                 </span>
                 <h2 className="text-xl font-extrabold text-zinc-900 mt-0.5">
-                  Upload New Looks
+                  Upload Photos
                 </h2>
               </div>
               <button
@@ -586,6 +695,41 @@ export function GalleryScreen() {
 
             {/* Form */}
             <form onSubmit={handleAddLook} className="flex flex-col gap-4 mt-5">
+              {/* Destination Section Picker */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-zinc-800">
+                  Select Gallery Section <span className="text-[#FF272A]">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setUploadCategory("salon")}
+                    className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
+                      uploadCategory === "salon"
+                        ? "border-[#FF272A] bg-red-50/40 text-[#FF272A] shadow-xs ring-2 ring-[#FF272A]/20"
+                        : "border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700"
+                    }`}
+                  >
+                    <Sparkles className="w-4 h-4 text-[#FF272A]" />
+                    <span>Salon Gallery</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setUploadCategory("photography")}
+                    className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition-all cursor-pointer ${
+                      uploadCategory === "photography"
+                        ? "border-[#FF272A] bg-red-50/40 text-[#FF272A] shadow-xs ring-2 ring-[#FF272A]/20"
+                        : "border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700"
+                    }`}
+                  >
+                    <Camera className="w-4 h-4 text-[#FF272A]" />
+                    <span>Photography</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Photo Upload Input */}
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-semibold text-zinc-800">
@@ -660,7 +804,7 @@ export function GalleryScreen() {
                     </div>
 
                     <span className="text-[11px] text-emerald-600 font-semibold px-1">
-                      ✓ {uploadedPreviews.length} photo{uploadedPreviews.length > 1 ? "s" : ""} ready for WebP Cloudinary upload
+                      ✓ {uploadedPreviews.length} photo{uploadedPreviews.length > 1 ? "s" : ""} selected for {uploadCategory === "photography" ? "Photography" : "Salon Gallery"}
                     </span>
                   </div>
                 )}
@@ -701,7 +845,8 @@ export function GalleryScreen() {
                     <>
                       <Check className="w-3.5 h-3.5 text-[#FF272A]" />
                       <span>
-                        Upload {selectedFiles.length > 0 ? `${selectedFiles.length} ` : ""}to Cloudinary
+                        Upload {selectedFiles.length > 0 ? `${selectedFiles.length} ` : ""}to{" "}
+                        {uploadCategory === "photography" ? "Photography" : "Salon"}
                       </span>
                     </>
                   )}
@@ -715,11 +860,19 @@ export function GalleryScreen() {
       {/* Confirmation Dialog before deleting photos */}
       <ConfirmDeleteModal
         isOpen={deleteTarget !== null}
-        title={deleteTarget?.type === "all" ? "Delete All Lookbook Photos?" : "Delete Lookbook Photo?"}
+        title={
+          deleteTarget?.type === "all"
+            ? "Delete All Lookbook Photos?"
+            : deleteTarget?.type === "section"
+              ? `Clear All ${deleteTarget.category === "photography" ? "Photography" : "Salon"} Photos?`
+              : "Delete Lookbook Photo?"
+        }
         message={
           deleteTarget?.type === "all"
             ? "Are you sure you want to delete all photos? They will be permanently removed from Cloudinary and your gallery."
-            : "Are you sure you want to delete this photo? It will be permanently removed from Cloudinary and your gallery."
+            : deleteTarget?.type === "section"
+              ? `Are you sure you want to delete all photos in ${deleteTarget.category === "photography" ? "Photography" : "Salon Gallery"}?`
+              : "Are you sure you want to delete this photo? It will be permanently removed from Cloudinary and your gallery."
         }
         confirmLabel="Yes, Delete"
         cancelLabel="Cancel"

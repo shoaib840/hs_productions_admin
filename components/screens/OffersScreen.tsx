@@ -35,6 +35,7 @@ interface Offer {
   serviceIds?: string[];
   serviceName?: string;
   serviceNames?: string[];
+  servicePrices?: Record<string, number>;
   originalPrice: number;
   discountType: "percentage" | "fixed";
   discountValue: number;
@@ -47,6 +48,7 @@ interface ServiceOption {
   id: string;
   name: string;
   price: number;
+  maxPrice?: number;
 }
 
 export function OffersScreen() {
@@ -62,6 +64,7 @@ export function OffersScreen() {
   const [editingOfferId, setEditingOfferId] = useState<string | null>(null);
   const [title, setTitle] = useState<string>("");
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [selectedServicePrices, setSelectedServicePrices] = useState<Record<string, number>>({});
   const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
   const [discountValue, setDiscountValue] = useState<number>(20);
   const [description, setDescription] = useState<string>("");
@@ -70,6 +73,7 @@ export function OffersScreen() {
   // Secondary Service Picker Dialog State
   const [isServicePickerOpen, setIsServicePickerOpen] = useState<boolean>(false);
   const [tempSelectedServiceIds, setTempSelectedServiceIds] = useState<string[]>([]);
+  const [tempSelectedServicePrices, setTempSelectedServicePrices] = useState<Record<string, number>>({});
   const [serviceSearchQuery, setServiceSearchQuery] = useState<string>("");
 
   // Deletion State
@@ -86,6 +90,7 @@ export function OffersScreen() {
           id: d.id,
           name: d.data().name || "Service",
           price: Number(d.data().price) || 0,
+          maxPrice: d.data().maxPrice ? Number(d.data().maxPrice) : undefined,
         }));
         setAvailableServices(fetched);
       },
@@ -124,6 +129,7 @@ export function OffersScreen() {
             serviceIds,
             serviceName: data.serviceName || serviceNames[0] || "All Services",
             serviceNames,
+            servicePrices: data.servicePrices || {},
             originalPrice: Number(data.originalPrice) || 0,
             discountType: data.discountType === "fixed" ? "fixed" : "percentage",
             discountValue: Number(data.discountValue) || 0,
@@ -164,6 +170,7 @@ export function OffersScreen() {
         id: d.id,
         name: d.data().name || "Service",
         price: Number(d.data().price) || 0,
+        maxPrice: d.data().maxPrice ? Number(d.data().maxPrice) : undefined,
       }));
       setAvailableServices(fetchedServices);
 
@@ -188,6 +195,7 @@ export function OffersScreen() {
           serviceIds,
           serviceName: data.serviceName || serviceNames[0] || "All Services",
           serviceNames,
+          servicePrices: data.servicePrices || {},
           originalPrice: Number(data.originalPrice) || 0,
           discountType: data.discountType === "fixed" ? "fixed" : "percentage",
           discountValue: Number(data.discountValue) || 0,
@@ -213,11 +221,8 @@ export function OffersScreen() {
   const handleOpenAddModal = (targetServiceId?: string) => {
     setEditingOfferId(null);
     setTitle("");
-    setSelectedServiceIds(
-      targetServiceId
-        ? [targetServiceId]
-        : availableServices.map((s) => s.id)
-    );
+    setSelectedServiceIds(targetServiceId ? [targetServiceId] : []);
+    setSelectedServicePrices({});
     setDiscountType("percentage");
     setDiscountValue(20);
     setDescription("");
@@ -228,13 +233,14 @@ export function OffersScreen() {
   const handleOpenEditModal = (offer: Offer) => {
     setEditingOfferId(offer.id);
     setTitle(offer.title);
-    setSelectedServiceIds(
+    const sIds =
       offer.serviceIds && offer.serviceIds.length > 0
         ? offer.serviceIds.filter((id) => id !== "all")
         : offer.serviceId && offer.serviceId !== "all"
           ? [offer.serviceId]
-          : availableServices.map((s) => s.id)
-    );
+          : [];
+    setSelectedServiceIds(sIds);
+    setSelectedServicePrices(offer.servicePrices || {});
     setDiscountType(offer.discountType);
     setDiscountValue(offer.discountValue);
     setDescription(offer.description);
@@ -245,29 +251,53 @@ export function OffersScreen() {
   // Service Picker Dialog Handlers
   const handleOpenServicePicker = () => {
     setTempSelectedServiceIds([...selectedServiceIds]);
+    setTempSelectedServicePrices({ ...selectedServicePrices });
     setServiceSearchQuery("");
     setIsServicePickerOpen(true);
   };
 
-  const handleToggleTempService = (id: string) => {
+  const handleToggleTempService = (id: string, defaultPrice: number) => {
     if (tempSelectedServiceIds.includes(id)) {
       setTempSelectedServiceIds(tempSelectedServiceIds.filter((item) => item !== id));
+      setTempSelectedServicePrices((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
     } else {
       setTempSelectedServiceIds([...tempSelectedServiceIds, id]);
+      setTempSelectedServicePrices((prev) => ({
+        ...prev,
+        [id]: prev[id] ?? defaultPrice,
+      }));
     }
+  };
+
+  const handleSelectPrice = (id: string, price: number) => {
+    setTempSelectedServicePrices((prev) => ({
+      ...prev,
+      [id]: price,
+    }));
   };
 
   const handleToggleAllInPicker = () => {
     const allIds = availableServices.map((s) => s.id);
     if (tempSelectedServiceIds.length === allIds.length && allIds.length > 0) {
       setTempSelectedServiceIds([]);
+      setTempSelectedServicePrices({});
     } else {
       setTempSelectedServiceIds(allIds);
+      const allPrices: Record<string, number> = {};
+      availableServices.forEach((s) => {
+        allPrices[s.id] = tempSelectedServicePrices[s.id] ?? s.price;
+      });
+      setTempSelectedServicePrices(allPrices);
     }
   };
 
   const handleConfirmServiceSelection = () => {
     setSelectedServiceIds([...tempSelectedServiceIds]);
+    setSelectedServicePrices({ ...tempSelectedServicePrices });
     setIsServicePickerOpen(false);
   };
 
@@ -285,13 +315,17 @@ export function OffersScreen() {
         selectedServiceIds.includes(s.id)
       );
 
-      const combinedOriginalPrice = matchedServices.reduce((sum, s) => sum + s.price, 0);
+      const combinedOriginalPrice = matchedServices.reduce(
+        (sum, s) => sum + (selectedServicePrices[s.id] ?? s.price),
+        0
+      );
       const serviceNames = matchedServices.map((s) => s.name);
 
       const offerData = {
         title: title.trim(),
         serviceId: selectedServiceIds[0] || "",
         serviceIds: selectedServiceIds,
+        servicePrices: selectedServicePrices,
         serviceName:
           serviceNames.length === availableServices.length && availableServices.length > 0
             ? "All Services"
@@ -722,15 +756,21 @@ export function OffersScreen() {
                         {availableServices
                           .filter((s) => selectedServiceIds.includes(s.id))
                           .slice(0, 3)
-                          .map((s) => (
-                            <span
-                              key={s.id}
-                              className="inline-flex items-center gap-1 text-xs font-semibold text-zinc-800 bg-white px-2.5 py-0.5 rounded-full border border-zinc-200 shadow-2xs"
-                            >
-                              <Tag className="w-2.5 h-2.5 text-[#FF272A]" />
-                              {s.name}
-                            </span>
-                          ))}
+                          .map((s) => {
+                            const chosenPrice = selectedServicePrices[s.id] ?? s.price;
+                            return (
+                              <span
+                                key={s.id}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-zinc-800 bg-white px-2.5 py-0.5 rounded-full border border-zinc-200 shadow-2xs"
+                              >
+                                <Tag className="w-2.5 h-2.5 text-[#FF272A]" />
+                                <span>{s.name}</span>
+                                <span className="text-[10px] text-zinc-500 font-bold">
+                                  Rs.{chosenPrice.toLocaleString()}
+                                </span>
+                              </span>
+                            );
+                          })}
                         {selectedServiceIds.length > 3 && (
                           <span className="text-xs font-bold text-zinc-500 bg-zinc-200/60 px-2 py-0.5 rounded-full">
                             +{selectedServiceIds.length - 3} more
@@ -796,7 +836,7 @@ export function OffersScreen() {
               {/* Price Impact Preview (Combined Price & Discount) */}
               {selectedServiceIds.length > 0 && availableServices.length > 0 && (() => {
                 const matched = availableServices.filter((s) => selectedServiceIds.includes(s.id));
-                const totalOriginal = matched.reduce((sum, s) => sum + s.price, 0);
+                const totalOriginal = matched.reduce((sum, s) => sum + (selectedServicePrices[s.id] ?? s.price), 0);
                 const discountAmount =
                   discountType === "percentage"
                     ? Math.round(totalOriginal * (discountValue / 100))
@@ -815,18 +855,19 @@ export function OffersScreen() {
                     {/* Individual Selected Services */}
                     <div className="flex flex-col gap-1.5 text-[11px] text-zinc-500 pt-1.5 border-t border-zinc-200/60 max-h-28 overflow-y-auto">
                       {matched.map((s) => {
+                        const sPrice = selectedServicePrices[s.id] ?? s.price;
                         const itemDiscount =
                           discountType === "percentage"
-                            ? Math.round(s.price * (discountValue / 100))
+                            ? Math.round(sPrice * (discountValue / 100))
                             : Math.round(discountValue / (matched.length || 1));
-                        const itemFinal = Math.max(0, s.price - itemDiscount);
+                        const itemFinal = Math.max(0, sPrice - itemDiscount);
 
                         return (
                           <div key={s.id} className="flex items-center justify-between py-0.5">
                             <span className="truncate text-zinc-700 font-medium">{s.name}</span>
                             <span className="shrink-0 font-semibold text-zinc-800">
                               <span className="line-through text-zinc-400 font-normal mr-2">
-                                Rs.{s.price.toLocaleString()}
+                                Rs.{sPrice.toLocaleString()}
                               </span>
                               Rs.{itemFinal.toLocaleString()}
                             </span>
@@ -965,10 +1006,13 @@ export function OffersScreen() {
               {/* Real Services from Firebase */}
               {filteredPickerServices.map((srv) => {
                 const isSelected = tempSelectedServiceIds.includes(srv.id);
+                const hasTwoPrices = Boolean(srv.maxPrice && srv.maxPrice > srv.price);
+                const chosenPrice = tempSelectedServicePrices[srv.id] ?? srv.price;
+
                 return (
                   <div
                     key={srv.id}
-                    onClick={() => handleToggleTempService(srv.id)}
+                    onClick={() => handleToggleTempService(srv.id, srv.price)}
                     className={`p-3 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${isSelected
                       ? "bg-red-50/30 border-[#FF272A] shadow-xs"
                       : "bg-white border-zinc-200 hover:border-zinc-300"
@@ -987,9 +1031,70 @@ export function OffersScreen() {
                         {srv.name}
                       </span>
                     </div>
-                    <span className="text-xs font-bold text-zinc-900 shrink-0">
-                      Rs.{srv.price}
-                    </span>
+
+                    {/* Price with Radio Selection if 2 prices exist */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {hasTwoPrices && isSelected ? (
+                        <div
+                          className="flex items-center gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {/* First Price Radio (Selected by default) */}
+                          <button
+                            type="button"
+                            onClick={() => handleSelectPrice(srv.id, srv.price)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
+                              chosenPrice === srv.price
+                                ? "bg-white border-[#FF272A] text-[#FF272A] shadow-xs"
+                                : "bg-white/70 border-zinc-200 text-zinc-600 hover:border-zinc-300"
+                            }`}
+                          >
+                            <span
+                              className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                                chosenPrice === srv.price
+                                  ? "border-[#FF272A] bg-white"
+                                  : "border-zinc-300 bg-white"
+                              }`}
+                            >
+                              {chosenPrice === srv.price && (
+                                <span className="w-2 h-2 rounded-full bg-[#FF272A]" />
+                              )}
+                            </span>
+                            <span>Rs.{srv.price.toLocaleString()}</span>
+                          </button>
+
+                          {/* Second Price Radio */}
+                          <button
+                            type="button"
+                            onClick={() => handleSelectPrice(srv.id, srv.maxPrice!)}
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
+                              chosenPrice === srv.maxPrice
+                                ? "bg-white border-[#FF272A] text-[#FF272A] shadow-xs"
+                                : "bg-white/70 border-zinc-200 text-zinc-600 hover:border-zinc-300"
+                            }`}
+                          >
+                            <span
+                              className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
+                                chosenPrice === srv.maxPrice
+                                  ? "border-[#FF272A] bg-white"
+                                  : "border-zinc-300 bg-white"
+                              }`}
+                            >
+                              {chosenPrice === srv.maxPrice && (
+                                <span className="w-2 h-2 rounded-full bg-[#FF272A]" />
+                              )}
+                            </span>
+                            <span>Rs.{srv.maxPrice!.toLocaleString()}</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs font-bold text-zinc-900">
+                          {hasTwoPrices
+                            ? `Rs.${srv.price.toLocaleString()} - ${srv.maxPrice!.toLocaleString()}`
+                            : `Rs.${srv.price.toLocaleString()}`}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 );
               })}

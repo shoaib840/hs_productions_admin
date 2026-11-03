@@ -144,31 +144,50 @@ export async function compressAndConvertToWebP(
  */
 export async function uploadImageToCloudinary(
   file: File,
-  folder = "hs_lookbook"
+  folder = "hs_lookbook",
+  retries = 2
 ): Promise<CloudinaryUploadResult> {
   // Step 1: Compress and convert to WebP <= 100 KB
   const webpFile = await compressAndConvertToWebP(file, { targetSizeKB: 100 });
 
-  // Step 2: Upload to Next.js Cloudinary API route
-  const formData = new FormData();
-  formData.append("file", webpFile);
-  formData.append("folder", folder);
+  // Step 2: Upload to Next.js Cloudinary API route with retry
+  let lastError: any = null;
 
-  const res = await fetch("/api/upload", {
-    method: "POST",
-    body: formData,
-  });
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const formData = new FormData();
+      formData.append("file", webpFile);
+      formData.append("folder", folder);
 
-  if (!res.ok) {
-    const errorJson = await res.json().catch(() => ({}));
-    throw new Error(errorJson.error || `Upload failed with HTTP ${res.status}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        const errorJson = await res.json().catch(() => ({}));
+        throw new Error(errorJson.error || `Upload failed with HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      return {
+        url: data.secure_url,
+        publicId: data.public_id,
+      };
+    } catch (err: any) {
+      lastError = err;
+      if (attempt < retries) {
+        await new Promise((res) => setTimeout(res, 1200));
+      }
+    }
   }
 
-  const data = await res.json();
-  return {
-    url: data.secure_url,
-    publicId: data.public_id,
-  };
+  throw lastError || new Error("Image upload timed out. Please try again.");
 }
 
 /**

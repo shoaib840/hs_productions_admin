@@ -89,27 +89,30 @@ export function StatCards({ onTabChange }: StatCardsProps) {
 
     // 3. Live listener for Gallery collection
     const unsubGallery = onSnapshot(
-      doc(db, "gallery", "gallery"),
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
+      collection(db, "gallery"),
+      (snapshot) => {
+        let allUrls: string[] = [];
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data();
           const rawImages: any[] = data.images || data.items || [];
-          const validUrls = rawImages
-            .map((item: any) =>
+          rawImages.forEach((item: any) => {
+            const url =
               typeof item === "string"
                 ? item
                 : typeof item?.imageUrl === "string"
                   ? item.imageUrl.trim()
-                  : ""
-            )
-            .filter((url: string) => Boolean(url && url.length > 0));
+                  : "";
+            if (url) {
+              allUrls.push(url);
+            }
+          });
+        });
 
-          if (validUrls.length > 0) {
-            setGalleryCount(validUrls.length);
-            setHeroImage(validUrls[0]);
-          } else {
-            setGalleryCount(0);
-          }
+        if (allUrls.length > 0) {
+          setGalleryCount(allUrls.length);
+          setHeroImage(allUrls[0]);
+        } else {
+          setGalleryCount(0);
         }
       },
       (err) => console.error("Firestore gallery stat error:", err)
