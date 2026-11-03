@@ -22,7 +22,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -31,11 +31,13 @@ export default function LoginPage() {
   // Load remembered email on mount
   useEffect(() => {
     try {
-      const savedRemember = localStorage.getItem("hs_admin_remember_me") === "true";
+      const savedRemember = localStorage.getItem("hs_admin_remember_me");
+      if (savedRemember !== null) {
+        setRememberMe(savedRemember === "true");
+      }
       const savedEmail = localStorage.getItem("hs_admin_email");
-      if (savedRemember && savedEmail) {
+      if (savedEmail) {
         setEmail(savedEmail);
-        setRememberMe(true);
       }
     } catch {
       // Ignore localStorage read errors
@@ -138,6 +140,17 @@ export default function LoginPage() {
       setIsResetting(false);
     }
   };
+
+  if (authLoading || user) {
+    return (
+      <main className="w-full h-screen bg-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <span className="w-8 h-8 border-3 border-zinc-200 border-t-[#FF272A] rounded-full animate-spin" />
+          <span className="text-xs font-semibold text-zinc-500 tracking-wider uppercase">Loading Portal...</span>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-white flex flex-col justify-start lg:justify-center items-center pt-7 sm:pt-10 lg:pt-0 px-4 py-6 sm:p-6 lg:p-8">

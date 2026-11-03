@@ -34,6 +34,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    // Ensure persistence defaults to local storage across tabs and sessions
+    setPersistence(auth, browserLocalPersistence).catch(() => {});
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
@@ -42,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const signIn = async (email: string, pass: string, remember: boolean = false) => {
+  const signIn = async (email: string, pass: string, remember: boolean = true) => {
     try {
       await setPersistence(
         auth,
