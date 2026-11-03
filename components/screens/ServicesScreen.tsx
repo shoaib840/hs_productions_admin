@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { Plus, Edit2, Trash2, X, Check, Upload, ImageIcon, Layers, Loader2, RefreshCw } from "lucide-react";
+import { Plus, Edit2, Trash2, X, Check, Upload, ImageIcon, Layers, Loader2, RefreshCw, Camera } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
 import { db } from "@/lib/firebase";
@@ -88,7 +88,7 @@ export function ServicesScreen() {
                 ? Number(data.maxPrice)
                 : undefined,
             duration: data.duration || "60 min",
-            image: data.image || "/salon-hero.jpg",
+            image: data.image && data.image !== "/salon-hero.jpg" ? data.image : "",
             cloudinaryPublicId: data.cloudinaryPublicId || "",
             description: data.description || "",
             createdAt,
@@ -131,7 +131,7 @@ export function ServicesScreen() {
               ? Number(data.maxPrice)
               : undefined,
           duration: data.duration || "60 min",
-          image: data.image || "/salon-hero.jpg",
+          image: data.image && data.image !== "/salon-hero.jpg" ? data.image : "",
           cloudinaryPublicId: data.cloudinaryPublicId || "",
           description: data.description || "",
           createdAt,
@@ -192,7 +192,7 @@ export function ServicesScreen() {
       price: service.price,
       maxPrice: service.maxPrice !== undefined ? service.maxPrice : "",
       duration: service.duration,
-      image: service.image,
+      image: service.image && service.image !== "/salon-hero.jpg" ? service.image : "",
       cloudinaryPublicId: service.cloudinaryPublicId || "",
       description: service.description,
     });
@@ -240,7 +240,7 @@ export function ServicesScreen() {
         price: priceNum,
         maxPrice: maxPriceNum,
         duration: formData.duration.trim() || "60 min",
-        image: formData.image || "/salon-hero.jpg",
+        image: formData.image && formData.image !== "/salon-hero.jpg" ? formData.image : "",
         cloudinaryPublicId: formData.cloudinaryPublicId || "",
         description: formData.description.trim(),
         updatedAt: serverTimestamp(),
@@ -354,16 +354,25 @@ export function ServicesScreen() {
               key={item.id}
               className="p-3 sm:p-4 rounded-2xl bg-white border border-zinc-200/90 shadow-sm hover:shadow-md transition-all flex flex-row gap-3 sm:gap-4 items-stretch group hover:border-[#FF272A]/40"
             >
-              {/* Left Side Image */}
-              <div className="relative w-24 sm:w-28 md:w-32 min-h-[105px] sm:min-h-[120px] rounded-xl overflow-hidden shrink-0 bg-zinc-100 self-stretch">
-                <Image
-                  src={item.image}
-                  alt={item.name}
-                  fill
-                  unoptimized
-                  sizes="(max-width: 640px) 112px, 128px"
-                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                />
+              {/* Left Side Image or Camera Placeholder */}
+              <div className="relative w-24 sm:w-28 md:w-32 min-h-[105px] sm:min-h-[120px] rounded-xl overflow-hidden shrink-0 bg-zinc-100 flex items-center justify-center self-stretch border border-zinc-200/60">
+                {item.image && item.image !== "/salon-hero.jpg" ? (
+                  <Image
+                    src={item.image}
+                    alt={item.name}
+                    fill
+                    unoptimized
+                    sizes="(max-width: 640px) 112px, 128px"
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-zinc-50 text-zinc-400 group-hover:text-zinc-600 transition-colors p-2 text-center">
+                    <div className="w-9 h-9 rounded-xl bg-zinc-200/70 flex items-center justify-center">
+                      <Camera className="w-4 h-4 text-zinc-500" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-zinc-400">No Image</span>
+                  </div>
+                )}
               </div>
 
               {/* Right Side Content */}
@@ -506,8 +515,9 @@ export function ServicesScreen() {
 
               {/* Service Image (Upload from Laptop / Mobile Gallery) */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-zinc-800">
-                  Service Image (Upload from Laptop or Mobile) <span className="text-[#FF272A]">*</span>
+                <label className="text-xs font-semibold text-zinc-800 flex items-center justify-between">
+                  <span>Service Image</span>
+                  <span className="text-[10px] text-zinc-400 font-normal">Optional</span>
                 </label>
 
                 <div
@@ -533,7 +543,7 @@ export function ServicesScreen() {
                     </div>
                   ) : (
                     <div className="w-14 h-14 rounded-xl bg-zinc-200/60 text-zinc-400 flex items-center justify-center shrink-0 group-hover:text-[#FF272A] transition-colors">
-                      <Upload className="w-6 h-6" />
+                      <Camera className="w-6 h-6" />
                     </div>
                   )}
 
