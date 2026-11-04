@@ -19,7 +19,7 @@ interface StatCardsProps {
 
 export function StatCards({ onTabChange }: StatCardsProps) {
   // 1. Services Stats State
-  const [servicesCount, setServicesCount] = useState<number>(6);
+  const [servicesCount, setServicesCount] = useState<number>(0);
   const [totalServicesPrice, setTotalServicesPrice] = useState<number>(0);
 
   // 2. Inquiries Stats State (from monthly_lead_records)
@@ -40,9 +40,9 @@ export function StatCards({ onTabChange }: StatCardsProps) {
   const [heroImage, setHeroImage] = useState<string>(() => {
     if (typeof window !== "undefined") {
       const c = getCachedGallery();
-      return c?.items?.[0]?.imageUrl || "/salon-hero.jpg";
+      return c?.items?.[0]?.imageUrl || "";
     }
-    return "/salon-hero.jpg";
+    return "";
   });
 
   useEffect(() => {
@@ -56,10 +56,11 @@ export function StatCards({ onTabChange }: StatCardsProps) {
           const prices = snap.docs
             .map((d) => Number(d.data().price) || 0)
             .filter((p) => p > 0);
-          if (prices.length > 0) {
-            const sum = prices.reduce((acc, curr) => acc + curr, 0);
-            setTotalServicesPrice(sum);
-          }
+          const sum = prices.reduce((acc, curr) => acc + curr, 0);
+          setTotalServicesPrice(sum);
+        } else {
+          setServicesCount(0);
+          setTotalServicesPrice(0);
         }
       },
       (err) => console.error("Firestore services stat error:", err)
@@ -126,7 +127,7 @@ export function StatCards({ onTabChange }: StatCardsProps) {
   }, []);
 
   // Determine pill count for services
-  const pillsToRender = Math.min(Math.max(servicesCount, 1), 6);
+  const pillsToRender = Math.min(servicesCount, 6);
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
@@ -162,18 +163,26 @@ export function StatCards({ onTabChange }: StatCardsProps) {
 
         {/* Capsule Progress Bars + 100% Live Badge */}
         <div className="flex items-center justify-between gap-1 pt-1 flex-wrap xs:flex-nowrap">
-          <div className="flex items-center gap-1 sm:gap-1.5">
-            {Array.from({ length: pillsToRender }).map((_, index) => (
-              <div
-                key={index}
-                title={`Active service tier ${index + 1}`}
-                className="w-2.5 sm:w-3.5 h-6 sm:h-8 rounded-full bg-[#111215] transition-all hover:scale-105"
-              />
-            ))}
+          <div className="flex items-center gap-1 sm:gap-1.5 min-h-[24px]">
+            {pillsToRender > 0 ? (
+              Array.from({ length: pillsToRender }).map((_, index) => (
+                <div
+                  key={index}
+                  title={`Active service tier ${index + 1}`}
+                  className="w-2.5 sm:w-3.5 h-6 sm:h-8 rounded-full bg-[#111215] transition-all hover:scale-105"
+                />
+              ))
+            ) : (
+              <span className="text-[11px] text-zinc-400 font-medium">0 Services Active</span>
+            )}
           </div>
-          <span className="inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-emerald-500 text-white text-[9px] sm:text-[11px] font-semibold shadow-2xs shrink-0">
+          <span
+            className={`inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full text-white text-[9px] sm:text-[11px] font-semibold shadow-2xs shrink-0 ${
+              servicesCount > 0 ? "bg-emerald-500" : "bg-zinc-400"
+            }`}
+          >
             <CheckCircle2 className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-            <span>100% Live</span>
+            <span>{servicesCount > 0 ? "100% Live" : "0 Active"}</span>
           </span>
         </div>
       </div>
@@ -236,15 +245,20 @@ export function StatCards({ onTabChange }: StatCardsProps) {
         className="col-span-2 md:col-span-1 bg-[#111214] text-white rounded-2xl sm:rounded-[30px] p-4 sm:p-6 relative overflow-hidden flex flex-col justify-between hover:shadow-md transition-all group min-h-[150px] sm:min-h-[170px] cursor-pointer active:scale-[0.99]"
       >
         {/* Background photo overlay */}
-        <div className="absolute right-0 top-0 bottom-0 w-[55%] pointer-events-none opacity-80 group-hover:scale-105 transition-transform duration-500">
-          <Image
-            src={heroImage}
-            alt="Studio Lookbook"
-            fill
-            className="object-cover object-center"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#111214] via-[#111214]/80 to-transparent" />
-        </div>
+        {heroImage ? (
+          <div className="absolute right-0 top-0 bottom-0 w-[55%] pointer-events-none opacity-80 group-hover:scale-105 transition-transform duration-500">
+            <Image
+              src={heroImage}
+              alt="Studio Lookbook"
+              fill
+              unoptimized
+              priority
+              sizes="(max-width: 768px) 55vw, 30vw"
+              className="object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#111214] via-[#111214]/80 to-transparent" />
+          </div>
+        ) : null}
 
         {/* Card Header & Title */}
         <div className="relative z-10 max-w-[65%]">

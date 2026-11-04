@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { initializeFirestore, getFirestore, Firestore, setLogLevel } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
 import { getAnalytics, isSupported, Analytics } from "firebase/analytics";
 
@@ -19,7 +19,25 @@ const app: FirebaseApp = getApps().length ? getApp() : initializeApp(firebaseCon
 
 // Initialize Firebase services
 const auth: Auth = getAuth(app);
-const db: Firestore = getFirestore(app);
+
+// Suppress internal stream close noise during route changes
+if (typeof window !== "undefined") {
+  try {
+    setLogLevel("error");
+  } catch {
+    // Ignore log level errors
+  }
+}
+
+let db: Firestore;
+try {
+  db = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+  });
+} catch {
+  db = getFirestore(app);
+}
+
 const storage: FirebaseStorage = getStorage(app);
 
 // Initialize Analytics conditionally (only in browser, online, and production to avoid offline/ad-blocker errors)

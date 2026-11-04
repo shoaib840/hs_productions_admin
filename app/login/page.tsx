@@ -398,6 +398,7 @@ export default function LoginPage() {
                         src="/user-avatar.jpg"
                         alt="Admin Avatar"
                         fill
+                        sizes="20px"
                         className="object-cover"
                       />
                     </div>

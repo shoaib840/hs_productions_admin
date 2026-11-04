@@ -36,41 +36,6 @@ interface RightResourcesProps {
   onTabChange?: (tab: string) => void;
 }
 
-const DEFAULT_INQUIRIES: InquiryItem[] = [
-  {
-    id: "inq_1",
-    client: "Sophia Montgomery",
-    service: "Royal Bridal Package",
-    time: "Oct 24 • 11:00 AM",
-    status: "New",
-    phone: "03041539548",
-  },
-  {
-    id: "inq_2",
-    client: "Alexander Wright",
-    service: "Gentlemen's Grooming",
-    time: "Oct 22 • 4:30 PM",
-    status: "Confirmed",
-    phone: "03001234567",
-  },
-  {
-    id: "inq_3",
-    client: "Camila De Silva",
-    service: "Balayage & Gloss",
-    time: "Oct 25 • 1:00 PM",
-    status: "Contacted",
-    phone: "03029876543",
-  },
-  {
-    id: "inq_4",
-    client: "Isabella Fontaine",
-    service: "Hydra-Radiance Facial",
-    time: "Oct 26 • 10:00 AM",
-    status: "New",
-    phone: "03015554321",
-  },
-];
-
 function getBadgeStyle(status: string) {
   const s = status.toLowerCase();
   if (s === "confirmed" || s === "marked" || s === "read") {
@@ -91,7 +56,7 @@ export function RightResources({ onTabChange }: RightResourcesProps) {
   const [activeDealsCount, setActiveDealsCount] = useState<number>(0);
 
   // 3. Inquiries State
-  const [inquiries, setInquiries] = useState<InquiryItem[]>(DEFAULT_INQUIRIES);
+  const [inquiries, setInquiries] = useState<InquiryItem[]>([]);
   const [inquiriesLoading, setInquiriesLoading] = useState<boolean>(true);
 
   // 4. Studio Concierge Info

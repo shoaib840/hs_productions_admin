@@ -30,8 +30,8 @@
   --color-card-red: var(--card-red);
   --color-card-lime: var(--card-red);
   --color-card-dark: var(--card-dark);
-  --font-display: var(--font-plus-jakarta), sans-serif;
-  --font-sans: var(--font-plus-jakarta), sans-serif;
+  --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 body {

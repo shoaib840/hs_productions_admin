@@ -33,105 +33,107 @@ export async function compressAndConvertToWebP(
       return resolve(file);
     }
 
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Failed to read image file"));
-    reader.onload = () => {
-      const img = new window.Image();
-      img.onerror = () => reject(new Error("Failed to decode image data"));
-      img.onload = async () => {
-        try {
-          let { width, height } = img;
+    const objectUrl = URL.createObjectURL(file);
+    const img = new window.Image();
 
-          // Scale down dimensions if exceeding maxDimension, maintaining aspect ratio
-          if (width > maxDimension || height > maxDimension) {
-            if (width > height) {
-              height = Math.round((height * maxDimension) / width);
-              width = maxDimension;
-            } else {
-              width = Math.round((width * maxDimension) / height);
-              height = maxDimension;
-            }
-          }
-
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext("2d", { alpha: true });
-          if (!ctx) {
-            return reject(new Error("Failed to create 2D canvas context"));
-          }
-
-          // Enable high-quality bicubic image smoothing
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = "high";
-          ctx.drawImage(img, 0, 0, width, height);
-
-          // Adaptive compression loop to target <= 100 KB
-          const qualities = [initialQuality, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55];
-          let bestBlob: Blob | null = null;
-
-          for (const q of qualities) {
-            const blob = await new Promise<Blob | null>((res) =>
-              canvas.toBlob((b) => res(b), "image/webp", q)
-            );
-
-            if (!blob) continue;
-            bestBlob = blob;
-
-            // If under or around target size, accept it
-            if (blob.size <= targetBytes) {
-              break;
-            }
-          }
-
-          // If still over target size, scale canvas down slightly and re-compress at 0.70
-          if (bestBlob && bestBlob.size > targetBytes && (width > 800 || height > 800)) {
-            const scale = Math.sqrt(targetBytes / bestBlob.size);
-            const scaledW = Math.max(640, Math.round(width * Math.min(scale, 0.85)));
-            const scaledH = Math.max(480, Math.round(height * Math.min(scale, 0.85)));
-
-            const scaledCanvas = document.createElement("canvas");
-            scaledCanvas.width = scaledW;
-            scaledCanvas.height = scaledH;
-            const scaledCtx = scaledCanvas.getContext("2d", { alpha: true });
-
-            if (scaledCtx) {
-              scaledCtx.imageSmoothingEnabled = true;
-              scaledCtx.imageSmoothingQuality = "high";
-              scaledCtx.drawImage(img, 0, 0, scaledW, scaledH);
-
-              const smallerBlob = await new Promise<Blob | null>((res) =>
-                scaledCanvas.toBlob((b) => res(b), "image/webp", 0.72)
-              );
-
-              if (smallerBlob) {
-                bestBlob = smallerBlob;
-              }
-            }
-          }
-
-          if (!bestBlob) {
-            return reject(new Error("Failed to generate WebP image blob"));
-          }
-
-          // Build clean .webp file name
-          const baseName = file.name.replace(/\.[^/.]+$/, "");
-          const webpFile = new File([bestBlob], `${baseName}.webp`, {
-            type: "image/webp",
-            lastModified: Date.now(),
-          });
-
-          resolve(webpFile);
-        } catch (err) {
-          reject(err);
-        }
-      };
-
-      img.src = reader.result as string;
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Failed to decode image data"));
     };
 
-    reader.readAsDataURL(file);
+    img.onload = async () => {
+      try {
+        let { width, height } = img;
+
+        // Scale down dimensions if exceeding maxDimension, maintaining aspect ratio
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d", { alpha: true });
+        if (!ctx) {
+          return reject(new Error("Failed to create 2D canvas context"));
+        }
+
+        // Enable high-quality bicubic image smoothing
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Adaptive compression loop to target <= 100 KB
+        const qualities = [initialQuality, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55];
+        let bestBlob: Blob | null = null;
+
+        for (const q of qualities) {
+          const blob = await new Promise<Blob | null>((res) =>
+            canvas.toBlob((b) => res(b), "image/webp", q)
+          );
+
+          if (!blob) continue;
+          bestBlob = blob;
+
+          // If under or around target size, accept it
+          if (blob.size <= targetBytes) {
+            break;
+          }
+        }
+
+        // If still over target size, scale canvas down slightly and re-compress at 0.70
+        if (bestBlob && bestBlob.size > targetBytes && (width > 800 || height > 800)) {
+          const scale = Math.sqrt(targetBytes / bestBlob.size);
+          const scaledW = Math.max(640, Math.round(width * Math.min(scale, 0.85)));
+          const scaledH = Math.max(480, Math.round(height * Math.min(scale, 0.85)));
+
+          const scaledCanvas = document.createElement("canvas");
+          scaledCanvas.width = scaledW;
+          scaledCanvas.height = scaledH;
+          const scaledCtx = scaledCanvas.getContext("2d", { alpha: true });
+
+          if (scaledCtx) {
+            scaledCtx.imageSmoothingEnabled = true;
+            scaledCtx.imageSmoothingQuality = "high";
+            scaledCtx.drawImage(img, 0, 0, scaledW, scaledH);
+
+            const smallerBlob = await new Promise<Blob | null>((res) =>
+              scaledCanvas.toBlob((b) => res(b), "image/webp", 0.72)
+            );
+
+            if (smallerBlob) {
+              bestBlob = smallerBlob;
+            }
+          }
+        }
+
+        if (!bestBlob) {
+          return reject(new Error("Failed to generate WebP image blob"));
+        }
+
+        // Build clean .webp file name
+        const baseName = file.name.replace(/\.[^/.]+$/, "");
+        const webpFile = new File([bestBlob], `${baseName}.webp`, {
+          type: "image/webp",
+          lastModified: Date.now(),
+        });
+
+        resolve(webpFile);
+      } catch (err) {
+        reject(err);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+
+    img.src = objectUrl;
   });
 }
 

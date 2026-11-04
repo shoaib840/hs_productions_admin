@@ -333,6 +333,7 @@ export function AboutUsScreen() {
                             alt="Showcase 1"
                             fill
                             unoptimized
+                            sizes="(max-width: 768px) 50vw, 25vw"
                             className="object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                           <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">
@@ -390,6 +391,7 @@ export function AboutUsScreen() {
                             alt="Showcase 2"
                             fill
                             unoptimized
+                            sizes="(max-width: 768px) 50vw, 25vw"
                             className="object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                           <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-2">

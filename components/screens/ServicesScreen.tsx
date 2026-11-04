@@ -538,6 +538,7 @@ export function ServicesScreen() {
                         alt="Service preview"
                         fill
                         unoptimized
+                        sizes="64px"
                         className="object-cover"
                       />
                     </div>

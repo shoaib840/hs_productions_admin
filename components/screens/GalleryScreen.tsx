@@ -636,6 +636,7 @@ export function GalleryScreen() {
               alt="Fullscreen Studio Look"
               fill
               unoptimized
+              sizes="90vw"
               className="object-contain drop-shadow-2xl rounded-2xl"
               priority
             />
@@ -774,6 +775,7 @@ export function GalleryScreen() {
                               alt={`Upload ${idx + 1}`}
                               fill
                               unoptimized
+                              sizes="80px"
                               className="object-cover"
                             />
                           ) : null}
